@@ -1,0 +1,9 @@
+fastapi>=0.104.0
+uvicorn>=0.24.0
+nltk>=3.8.0
+speechrecognition>=3.10.0
+pyaudio>=0.2.11; python_version < '3.13'
+groq>=0.4.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+python-dotenv>=1.0.0
