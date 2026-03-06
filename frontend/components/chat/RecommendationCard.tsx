@@ -10,10 +10,12 @@ interface RecommendationCardProps {
   emotion: string;
   color: string;
   recommendations: {
-    send_message: string;
-    action: string;
-  };
+    type: string;
+    label: string;
+    text: string;
+  }[];
   source?: 'ai' | 'rules';
+  count?: number;
 }
 
 const emotionIcons: Record<string, string> = {
@@ -37,20 +39,28 @@ export default function RecommendationCard({
   color,
   recommendations,
   source,
+  count,
 }: RecommendationCardProps) {
   const gradientClass = colorClasses[color] || colorClasses.gray;
   const emoji = emotionIcons[emotion] || '🤔';
-  const [copiedField, setCopiedField] = useState<'send' | 'action' | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  const handleCopy = async (text: string, field: 'send' | 'action') => {
+  const handleCopy = async (text: string, index: number) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
+      setCopiedId(index);
+      setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
   };
+
+  // Handle both old and new format
+  const recsArray = Array.isArray(recommendations) ? recommendations : [];
+  
+  // Separate messages and actions
+  const messages = recsArray.filter((r: any) => r.type === 'message');
+  const actions = recsArray.filter((r: any) => r.type === 'action');
 
   return (
     <motion.div
@@ -59,8 +69,8 @@ export default function RecommendationCard({
       transition={{ duration: 0.4 }}
       className="flex justify-center my-4"
     >
-      <Card className={`w-full max-w-lg border-2 ${gradientClass} shadow-xl hover:shadow-2xl transition-shadow duration-300`}>
-        <CardHeader className="pb-3">
+      <Card className={`w-full max-w-2xl border-2 ${gradientClass} shadow-xl hover:shadow-2xl transition-shadow duration-300`}>
+        <CardHeader className="pb-3 border-b border-slate-200/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <motion.span 
@@ -78,12 +88,12 @@ export default function RecommendationCard({
                   {source === 'ai' ? (
                     <>
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span className="font-medium">AI-Powered Recommendations</span>
+                      <span className="font-medium">AI-Powered Recommendations ({count || recommendations.length} suggestions)</span>
                     </>
                   ) : (
                     <>
                       <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="font-medium">Smart Recommendations</span>
+                      <span className="font-medium">Smart Recommendations ({count || recommendations.length} suggestions)</span>
                     </>
                   )}
                 </p>
@@ -92,94 +102,121 @@ export default function RecommendationCard({
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3.5">
-          {/* Send Message Recommendation */}
-          <motion.div 
-            className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/60 hover:border-indigo-200 transition-all duration-200"
-            whileHover={{ scale: 1.01 }}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 shrink-0">
-                <Send className="w-4 h-4 text-indigo-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
-                  Send to someone
-                </p>
-                <p className="text-sm text-slate-800 italic leading-relaxed break-words">
-                  "{recommendations.send_message}"
-                </p>
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCopy(recommendations.send_message, 'send')}
-                    className={`h-8 mt-2 text-xs font-medium transition-all duration-200 ${
-                      copiedField === 'send'
-                        ? 'bg-green-100 text-green-700'
-                        : 'hover:bg-indigo-50 hover:text-indigo-700'
-                    }`}
+        <CardContent className="pt-4">
+          {/* Messages Section */}
+          {messages.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wide flex items-center gap-2">
+                <Send className="w-3.5 h-3.5 text-indigo-600" />
+                Messages to Send ({messages.length})
+              </h4>
+              <div className="grid gap-2">
+                {messages.map((rec, index) => (
+                  <motion.div
+                    key={`msg-${index}`}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="bg-indigo-50/80 backdrop-blur-sm rounded-xl p-3 border border-indigo-100 hover:border-indigo-300 transition-all duration-200"
                   >
-                    {copiedField === 'send' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 mr-1.5" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 mr-1.5" />
-                        Copy
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-indigo-700 mb-1">
+                          {rec.label}
+                        </p>
+                        <p className="text-sm text-slate-800 italic leading-relaxed">
+                          "{rec.text}"
+                        </p>
+                      </div>
+                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(rec.text, index)}
+                          className={`h-8 text-xs font-medium transition-all duration-200 ${
+                            copiedId === index
+                              ? 'bg-green-100 text-green-700'
+                              : 'hover:bg-indigo-100 hover:text-indigo-700'
+                          }`}
+                        >
+                          {copiedId === index ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 mr-1" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             </div>
-          </motion.div>
+          )}
 
-          {/* Action Recommendation */}
-          <motion.div 
-            className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-white/60 hover:border-emerald-200 transition-all duration-200"
-            whileHover={{ scale: 1.01 }}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 shrink-0">
-                <Footprints className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
-                  Self-care action
-                </p>
-                <p className="text-sm text-slate-800 leading-relaxed break-words">
-                  {recommendations.action}
-                </p>
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCopy(recommendations.action, 'action')}
-                    className={`h-8 mt-2 text-xs font-medium transition-all duration-200 ${
-                      copiedField === 'action'
-                        ? 'bg-green-100 text-green-700'
-                        : 'hover:bg-emerald-50 hover:text-emerald-700'
-                    }`}
+          {/* Actions Section */}
+          {actions.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wide flex items-center gap-2">
+                <Footprints className="w-3.5 h-3.5 text-emerald-600" />
+                Self-Care Actions ({actions.length})
+              </h4>
+              <div className="grid gap-2">
+                {actions.map((rec, index) => (
+                  <motion.div
+                    key={`act-${index}`}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: (messages.length + index) * 0.1 }}
+                    className="bg-emerald-50/80 backdrop-blur-sm rounded-xl p-3 border border-emerald-100 hover:border-emerald-300 transition-all duration-200"
                   >
-                    {copiedField === 'action' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 mr-1.5" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 mr-1.5" />
-                        Copy
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 shrink-0">
+                        <Footprints className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-emerald-700 mb-1">
+                          {rec.label}
+                        </p>
+                        <p className="text-sm text-slate-800 leading-relaxed">
+                          {rec.text}
+                        </p>
+                      </div>
+                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(rec.text, messages.length + index)}
+                          className={`h-8 text-xs font-medium transition-all duration-200 ${
+                            copiedId === messages.length + index
+                              ? 'bg-green-100 text-green-700'
+                              : 'hover:bg-emerald-100 hover:text-emerald-700'
+                          }`}
+                        >
+                          {copiedId === messages.length + index ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 mr-1" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             </div>
-          </motion.div>
+          )}
         </CardContent>
       </Card>
     </motion.div>

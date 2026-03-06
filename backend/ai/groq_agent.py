@@ -26,9 +26,9 @@ class GroqAgent:
     SYSTEM_PROMPT = """You are an empathetic emotion support assistant. 
 Your task is to provide helpful, actionable recommendations for someone experiencing an emotion.
 
-For each request, provide exactly 2 recommendations:
-1. A message they can send to another person (friend, family, colleague)
-2. A self-care action they can take immediately
+For each request, provide 4-5 diverse recommendations including:
+1-2. Messages they can send to different people (friend, family, colleague)
+2-3. Different self-care actions they can take immediately
 
 Keep responses concise, supportive, and practical.
 """
@@ -116,10 +116,35 @@ Keep responses concise, supportive, and practical.
 User is feeling: {emotion.upper()}
 Context: "{context}"
 
-Provide exactly 2 recommendations in this JSON format:
+Provide 4-5 diverse recommendations in this JSON format:
 {{
-    "send_message": "suggested message to send to someone",
-    "action": "self-care action to take"
+    "recommendations": [
+        {{
+            "type": "message",
+            "label": "Send to friend",
+            "text": "suggested message"
+        }},
+        {{
+            "type": "message",
+            "label": "Send to family",
+            "text": "suggested message"
+        }},
+        {{
+            "type": "action",
+            "label": "Quick relief",
+            "text": "self-care action"
+        }},
+        {{
+            "type": "action",
+            "label": "Long-term care",
+            "text": "self-care action"
+        }},
+        {{
+            "type": "action",
+            "label": "Mindfulness",
+            "text": "self-care action"
+        }}
+    ]
 }}
 
 Only respond with valid JSON, no additional text.
@@ -139,11 +164,21 @@ Only respond with valid JSON, no additional text.
             # Parse JSON
             data = json.loads(content)
             
-            # Validate structure
+            # Handle new format with multiple recommendations
+            if 'recommendations' in data and isinstance(data['recommendations'], list):
+                return {
+                    'recommendations': data['recommendations'],
+                    'count': len(data['recommendations'])
+                }
+            
+            # Fallback to old format (2 recommendations)
             if 'send_message' in data and 'action' in data:
                 return {
-                    'send_message': data['send_message'],
-                    'action': data['action']
+                    'recommendations': [
+                        {'type': 'message', 'label': 'Send Message', 'text': data['send_message']},
+                        {'type': 'action', 'label': 'Self-Care Action', 'text': data['action']}
+                    ],
+                    'count': 2
                 }
             
             return None

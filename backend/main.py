@@ -54,8 +54,9 @@ class AnalysisResponse(BaseModel):
     confidence: float
     emoji: str
     color: str
-    recommendations: Dict[str, str]
+    recommendations: list  # Changed to list for multiple recommendations
     source: str  # "ai" or "rules"
+    count: int  # Number of recommendations
     scores: Optional[Dict[str, float]] = None
 
 
@@ -110,27 +111,33 @@ async def detect_from_text(request: TextAnalysisRequest):
     emotion_result = detect_emotion(request.text)
     
     # 2. Get recommendations (AI or Rules)
-    recommendations = {}
+    recommendations_result = {}
     source = "rules"
-    
+    rec_count = 0
+
     if request.use_ai:
         # Try AI first
         ai_recs = get_ai_recommendations(
             emotion_result['emotion'],
             request.text
         )
-        
-        if ai_recs:
-            recommendations = ai_recs
+
+        if ai_recs and 'recommendations' in ai_recs:
+            recommendations_result = ai_recs['recommendations']
+            rec_count = ai_recs.get('count', len(ai_recs['recommendations']))
             source = "ai"
         else:
             # Fallback to rules
-            recommendations = get_rule_recommendations(emotion_result['emotion'])
+            rule_recs = get_rule_recommendations(emotion_result['emotion'])
+            recommendations_result = rule_recs.get('recommendations', [])
+            rec_count = rule_recs.get('count', len(rule_recs['recommendations']))
             source = "rules"
     else:
         # Use rules only
-        recommendations = get_rule_recommendations(emotion_result['emotion'])
-    
+        rule_recs = get_rule_recommendations(emotion_result['emotion'])
+        recommendations_result = rule_recs.get('recommendations', [])
+        rec_count = rule_recs.get('count', len(rule_recs['recommendations']))
+
     # 3. Build response
     return {
         "text": request.text,
@@ -138,7 +145,8 @@ async def detect_from_text(request: TextAnalysisRequest):
         "confidence": emotion_result['confidence'],
         "emoji": emotion_result['emoji'],
         "color": emotion_result['color'],
-        "recommendations": recommendations,
+        "recommendations": recommendations_result,
+        "count": rec_count,
         "source": source,
         "scores": emotion_result['scores']
     }
@@ -179,27 +187,33 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
     emotion_result = detect_emotion(transcribed_text)
     
     # 3. Get recommendations (AI or Rules)
-    recommendations = {}
+    recommendations_result = []
     source = "rules"
-    
+    rec_count = 0
+
     if request.use_ai:
         # Try AI first
         ai_recs = get_ai_recommendations(
             emotion_result['emotion'],
             transcribed_text
         )
-        
-        if ai_recs:
-            recommendations = ai_recs
+
+        if ai_recs and 'recommendations' in ai_recs:
+            recommendations_result = ai_recs['recommendations']
+            rec_count = ai_recs.get('count', len(ai_recs['recommendations']))
             source = "ai"
         else:
             # Fallback to rules
-            recommendations = get_rule_recommendations(emotion_result['emotion'])
+            rule_recs = get_rule_recommendations(emotion_result['emotion'])
+            recommendations_result = rule_recs.get('recommendations', [])
+            rec_count = rule_recs.get('count', len(rule_recs['recommendations']))
             source = "rules"
     else:
         # Use rules only
-        recommendations = get_rule_recommendations(emotion_result['emotion'])
-    
+        rule_recs = get_rule_recommendations(emotion_result['emotion'])
+        recommendations_result = rule_recs.get('recommendations', [])
+        rec_count = rule_recs.get('count', len(rule_recs['recommendations']))
+
     # 4. Build response
     return {
         "text": transcribed_text,
@@ -207,7 +221,8 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         "confidence": emotion_result['confidence'],
         "emoji": emotion_result['emoji'],
         "color": emotion_result['color'],
-        "recommendations": recommendations,
+        "recommendations": recommendations_result,
+        "count": rec_count,
         "source": source,
         "scores": emotion_result['scores']
     }
