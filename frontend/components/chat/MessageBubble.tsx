@@ -14,8 +14,12 @@ export interface Message {
   recommendations?: {
     send_message: string;
     action: string;
+    sources?: any;
+    quick_action?: any;
   };
   source?: 'ai' | 'rules';
+  multi_source?: any;
+  external_resources?: any;
   timestamp: Date;
 }
 

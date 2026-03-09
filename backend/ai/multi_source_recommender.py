@@ -1,0 +1,412 @@
+"""
+Multi-Source Recommendation Engine
+Provides comprehensive recommendations across music, podcasts, videos, activities, and more
+"""
+
+from typing import Dict, List, Optional
+import random
+
+
+class MultiSourceRecommender:
+    """Generate multi-source recommendations based on emotion"""
+
+    # Comprehensive emotion-specific recommendations across multiple sources
+    RECOMMENDATIONS = {
+        'joy': {
+            'music': [
+                {"title": "Happy - Pharrell Williams", "type": "song", "description": "Upbeat pop anthem"},
+                {"title": "Don't Stop Me Now - Queen", "type": "song", "description": "Energetic rock classic"},
+                {"title": "Walking on Sunshine - Katrina and the Waves", "type": "song", "description": "Feel-good hit"},
+                {"title": "Good as Hell - Lizzo", "type": "song", "description": "Empowering pop"},
+                {"title": "Three Little Birds - Bob Marley", "type": "song", "description": "Relaxing reggae vibes"}
+            ],
+            'podcast': [
+                {"title": "The Happiness Lab", "episode": "Season 1: Finding Joy", "description": "Science of happiness"},
+                {"title": "Ten Percent Happier", "episode": "Maintaining Positive Energy", "description": "Meditation & joy"},
+                {"title": "Optimal Living Daily", "episode": "Celebrating Small Wins", "description": "Personal development"}
+            ],
+            'video': [
+                {"title": "The Science of Happiness", "platform": "TED Talk", "duration": "12 min", "description": "Research-backed tips"},
+                {"title": "Happy - Official Music Video", "platform": "YouTube", "duration": "4 min", "description": "Feel-good visuals"},
+                {"title": "Good News Compilation", "platform": "YouTube", "duration": "10 min", "description": "Positive news stories"}
+            ],
+            'activity': [
+                {"title": "Dance Party", "description": "Put on your favorite upbeat songs and dance!", "duration": "10-15 min", "effort": "low"},
+                {"title": "Gratitude Journaling", "description": "Write down 3 things you're grateful for", "duration": "5-10 min", "effort": "low"},
+                {"title": "Share Your Joy", "description": "Call or message someone to share your happiness", "duration": "5-20 min", "effort": "low"},
+                {"title": "Creative Expression", "description": "Draw, paint, or create something inspired by your mood", "duration": "20-30 min", "effort": "medium"},
+                {"title": "Nature Walk", "description": "Take a walk outside and enjoy the moment", "duration": "15-30 min", "effort": "medium"}
+            ],
+            'book': [
+                {"title": "The Happiness Project", "author": "Gretchen Rubin", "description": "Year-long happiness journey"},
+                {"title": "Atomic Habits", "author": "James Clear", "description": "Building positive habits"},
+                {"title": "The Power of Now", "author": "Eckhart Tolle", "description": "Living in the present"}
+            ],
+            'app': [
+                {"name": "Headspace", "description": "Guided meditation for maintaining calm joy", "category": "Meditation"},
+                {"name": "Daylio", "description": "Mood tracking to remember happy moments", "category": "Journal"},
+                {"name": "Gratitude", "description": "Daily gratitude practice", "category": "Wellness"}
+            ],
+            'social': [
+                "Share your happiness on social media to inspire others",
+                "Invite a friend for coffee or lunch",
+                "Send a thank you message to someone who helped you",
+                "Plan a celebration gathering with loved ones"
+            ],
+            'self_care': [
+                "Take a celebratory bubble bath",
+                "Treat yourself to your favorite dessert",
+                "Get a massage or spa treatment",
+                "Wear your favorite outfit and feel confident"
+            ]
+        },
+
+        'anger': {
+            'music': [
+                {"title": "Weightless - Marconi Union", "type": "song", "description": "Scientifically designed to reduce stress"},
+                {"title": "Clair de Lune - Debussy", "type": "classical", "description": "Calming piano piece"},
+                {"title": "Watermark - Enya", "type": "new age", "description": "Soothing ambient sounds"},
+                {"title": "Gymnopédie No.1 - Satie", "type": "classical", "description": "Peaceful piano composition"},
+                {"title": "Breathe Me - Sia", "type": "song", "description": "Emotional release"}
+            ],
+            'podcast': [
+                {"title": "Ten Percent Happier", "episode": "Working with Anger", "description": "Buddhist perspective on anger"},
+                {"title": "The Daily Stoic", "episode": "Controlling Your Reactions", "description": "Stoic wisdom"},
+                {"title": "Mindful in Minutes", "episode": "Cooling Down Anger", "description": "Quick meditation"}
+            ],
+            'video': [
+                {"title": "Managing Anger", "platform": "TED Talk", "duration": "15 min", "description": "Psychologist's guide"},
+                {"title": "5-Minute Anger Management", "platform": "YouTube", "duration": "5 min", "description": "Quick techniques"},
+                {"title": "Box Breathing Exercise", "platform": "YouTube", "duration": "4 min", "description": "Calming breathing"}
+            ],
+            'activity': [
+                {"title": "Box Breathing", "description": "Inhale 4s, hold 4s, exhale 4s, hold 4s", "duration": "3-5 min", "effort": "low"},
+                {"title": "Progressive Muscle Relaxation", "description": "Tense and release each muscle group", "duration": "10-15 min", "effort": "low"},
+                {"title": "Write & Release", "description": "Write your feelings, then tear it up", "duration": "10 min", "effort": "low"},
+                {"title": "Cold Water Splash", "description": "Splash cold water on your face", "duration": "1-2 min", "effort": "low"},
+                {"title": "Walk It Off", "description": "Take a brisk walk to release tension", "duration": "15-20 min", "effort": "medium"},
+                {"title": "Punch Pillow", "description": "Physical release in a safe way", "duration": "2-5 min", "effort": "medium"}
+            ],
+            'book': [
+                {"title": "Anger: Wisdom for Cooling the Flames", "author": "Thich Nhat Hanh", "description": "Buddhist approach to anger"},
+                {"title": "The Dance of Anger", "author": "Harriet Lerner", "description": "Understanding anger patterns"},
+                {"title": "Rage", "author": "Octavio Paz", "description": "Poetic exploration of anger"}
+            ],
+            'app': [
+                {"name": "Calm", "description": "Guided meditations for anger management", "category": "Meditation"},
+                {"name": "Sanvello", "description": "Mood tracking and coping tools", "category": "Mental Health"},
+                {"name": "Breathe2Relax", "description": "Breathing exercises", "category": "Stress Relief"}
+            ],
+            'social': [
+                "Tell someone you need space right now",
+                "Schedule a conversation for when you're calmer",
+                "Join an online support community",
+                "Talk to a therapist or counselor"
+            ],
+            'self_care': [
+                "Take a cool shower to reset",
+                "Practice progressive muscle relaxation",
+                "Create a calm space with dim lighting",
+                "Drink herbal tea (chamomile or lavender)"
+            ]
+        },
+
+        'sadness': {
+            'music': [
+                {"title": "Lean on Me - Bill Withers", "type": "song", "description": "Comforting soul classic"},
+                {"title": "Bridge Over Troubled Water - Simon & Garfunkel", "type": "song", "description": "Supportive folk"},
+                {"title": "Rainbow - Kacey Musgraves", "type": "song", "description": "Hopeful country"},
+                {"title": "Fix You - Coldplay", "type": "song", "description": "Emotional healing"},
+                {"title": "Here Comes the Sun - The Beatles", "type": "song", "description": "Hopeful classic"}
+            ],
+            'podcast': [
+                {"title": "The Sad, Sad Podcast", "episode": "Processing Grief", "description": "Mental health discussions"},
+                {"title": "Terrible, Thanks for Asking", "episode": "It's Okay to Not Be Okay", "description": "Honest conversations"},
+                {"title": "The Hilarious World of Depression", "episode": "Finding Light", "description": "Comedy meets depression"}
+            ],
+            'video': [
+                {"title": "The Power of Vulnerability", "platform": "TED Talk", "duration": "20 min", "description": "Brené Brown's classic"},
+                {"title": "Depression is an Illness", "platform": "YouTube", "duration": "8 min", "description": "Understanding sadness"},
+                {"title": "Comforting Rain Sounds", "platform": "YouTube", "duration": "1 hour", "description": "Calming background"}
+            ],
+            'activity': [
+                {"title": "Warm Beverage Ritual", "description": "Make tea or hot chocolate mindfully", "duration": "10-15 min", "effort": "low"},
+                {"title": "Comfort Movie", "description": "Watch a favorite feel-good film", "duration": "1.5-2 hours", "effort": "low"},
+                {"title": "Gentle Stretching", "description": "Light yoga or stretching", "duration": "10-15 min", "effort": "low"},
+                {"title": "Call a Loved One", "description": "Reach out to someone who cares", "duration": "15-30 min", "effort": "medium"},
+                {"title": "Self-Compassion Letter", "description": "Write yourself a kind letter", "duration": "15-20 min", "effort": "medium"},
+                {"title": "Cozy Blanket Time", "description": "Wrap up and rest without guilt", "duration": "30-60 min", "effort": "low"}
+            ],
+            'book': [
+                {"title": "The Noonday Demon", "author": "Andrew Solomon", "description": "Anatomy of depression"},
+                {"title": "Reasons to Stay Alive", "author": "Matt Haig", "description": "Memoir of surviving depression"},
+                {"title": "The Upward Spiral", "author": "Alex Korb", "description": "Neuroscience of depression"}
+            ],
+            'app': [
+                {"name": "Woebot", "description": "AI therapy chatbot for support", "category": "Mental Health"},
+                {"name": "Moodpath", "description": "Depression screening and tracking", "category": "Mental Health"},
+                {"name": "Insight Timer", "description": "Free meditation library", "category": "Meditation"}
+            ],
+            'social': [
+                "Text a friend: 'Having a tough day, could use support'",
+                "Join a support group (online or in-person)",
+                "Schedule a therapy session",
+                "Let someone know you need a check-in call"
+            ],
+            'self_care': [
+                "Take a warm bath with Epsom salts",
+                "Create a cozy nest with pillows and blankets",
+                "Practice gentle self-compassion meditation",
+                "Allow yourself to cry if needed"
+            ]
+        },
+
+        'fear': {
+            'music': [
+                {"title": "Brave - Sara Bareilles", "type": "song", "description": "Empowering pop anthem"},
+                {"title": "Eye of the Tiger - Survivor", "type": "song", "description": "Motivational rock"},
+                {"title": "Unwritten - Natasha Bedingfield", "type": "song", "description": "Hopeful pop"},
+                {"title": "Titanium - David Guetta ft. Sia", "type": "song", "description": "Strong EDM anthem"},
+                {"title": "A Thousand Years - Christina Perri", "type": "song", "description": "Calming ballad"}
+            ],
+            'podcast': [
+                {"title": "Fearless", "episode": "Overcoming Anxiety", "description": "Practical strategies"},
+                {"title": "The Anxiety Coaches Podcast", "episode": "Calming Panic", "description": "Expert advice"},
+                {"title": "Mindful in Minutes", "episode": "Grounding Techniques", "description": "Quick anxiety relief"}
+            ],
+            'video': [
+                {"title": "All It Takes Is 10 Mindful Minutes", "platform": "TED Talk", "duration": "10 min", "description": "Andy Puddicombe"},
+                {"title": "5-4-3-2-1 Grounding Technique", "platform": "YouTube", "duration": "5 min", "description": "Anxiety relief"},
+                {"title": "Progressive Muscle Relaxation", "platform": "YouTube", "duration": "15 min", "description": "Full body relaxation"}
+            ],
+            'activity': [
+                {"title": "5-4-3-2-1 Grounding", "description": "Name 5 things you see, 4 you feel, 3 you hear, 2 you smell, 1 you taste", "duration": "3-5 min", "effort": "low"},
+                {"title": "Power Posing", "description": "Stand tall in a confident pose for 2 minutes", "duration": "2 min", "effort": "low"},
+                {"title": "Worry Time", "description": "Schedule 15 min to worry, then move on", "duration": "15 min", "effort": "low"},
+                {"title": "Fact-Check Your Fears", "description": "Write down what you fear vs. what's likely", "duration": "10-15 min", "effort": "medium"},
+                {"title": "Call Your Support Person", "description": "Talk to someone who makes you feel safe", "duration": "15-30 min", "effort": "medium"},
+                {"title": "Visualization Exercise", "description": "Imagine your safe place in detail", "duration": "10 min", "effort": "low"}
+            ],
+            'book': [
+                {"title": "Dare", "author": "Barry McDonagh", "description": "Anxiety and panic relief"},
+                {"title": "The Anxiety and Phobia Workbook", "author": "Edmund Bourne", "description": "Practical exercises"},
+                {"title": "Feel the Fear and Do It Anyway", "author": "Susan Jeffers", "description": "Classic self-help"}
+            ],
+            'app': [
+                {"name": "Dare", "description": "Anxiety and panic attack relief", "category": "Mental Health"},
+                {"name": "Rootd", "description": "Panic attack & anxiety relief", "category": "Mental Health"},
+                {"name": "Finch", "description": "Self-care pet game for mental health", "category": "Wellness"}
+            ],
+            'social': [
+                "Tell someone: 'I'm feeling anxious, can you help me talk through it?'",
+                "Join an anxiety support community",
+                "Schedule a therapy appointment",
+                "Ask a friend to accompany you to a stressful event"
+            ],
+            'self_care': [
+                "Create a safety kit with comforting items",
+                "Practice deep breathing with extended exhales",
+                "Use calming essential oils (lavender, bergamot)",
+                "Wrap yourself in a weighted blanket"
+            ]
+        },
+
+        'neutral': {
+            'music': [
+                {"title": "Lo-Fi Beats Playlist", "type": "playlist", "description": "Chill background music"},
+                {"title": "Peaceful Piano - Spotify", "type": "playlist", "description": "Relaxing instrumentals"},
+                {"title": "Coffee Shop Jazz", "type": "playlist", "description": "Smooth jazz vibes"},
+                {"title": "Nature Sounds Mix", "type": "ambient", "description": "Calming natural sounds"},
+                {"title": "Acoustic Morning - Playlist", "type": "playlist", "description": "Gentle acoustic songs"}
+            ],
+            'podcast': [
+                {"title": "Stuff You Should Know", "episode": "Random Interesting Topics", "description": "Educational fun"},
+                {"title": "TED Radio Hour", "episode": "Ideas Worth Spreading", "description": "Inspiring talks"},
+                {"title": "The Daily", "episode": "Current Events", "description": "News roundup"}
+            ],
+            'video': [
+                {"title": "Try Not to Smile Challenge", "platform": "YouTube", "duration": "10 min", "description": "Light entertainment"},
+                {"title": "How to Build Better Habits", "platform": "TED Talk", "duration": "15 min", "description": "Self-improvement"},
+                {"title": "Amazing Nature Documentary Clips", "platform": "YouTube", "duration": "20 min", "description": "Relaxing visuals"}
+            ],
+            'activity': [
+                {"title": "Learn Something New", "description": "Watch a tutorial or read about a topic", "duration": "20-30 min", "effort": "medium"},
+                {"title": "Organize One Small Thing", "description": "Tidy your desk or a drawer", "duration": "10-15 min", "effort": "low"},
+                {"title": "Take a Mindful Walk", "description": "Notice your surroundings without judgment", "duration": "15-20 min", "effort": "low"},
+                {"title": "Try a New Recipe", "description": "Cook something you've never made before", "duration": "30-60 min", "effort": "medium"},
+                {"title": "Stretch Break", "description": "Do some light stretching", "duration": "5-10 min", "effort": "low"},
+                {"title": "Plan Something Fun", "description": "Schedule an activity to look forward to", "duration": "10 min", "effort": "low"}
+            ],
+            'book': [
+                {"title": "Atomic Habits", "author": "James Clear", "description": "Small changes, big results"},
+                {"title": "Sapiens", "author": "Yuval Noah Harari", "description": "Fascinating history"},
+                {"title": "The Alchemist", "author": "Paulo Coelho", "description": "Inspiring fiction"}
+            ],
+            'app': [
+                {"name": "Duolingo", "description": "Learn a language in spare moments", "category": "Education"},
+                {"name": "Blinkist", "description": "Book summaries in 15 minutes", "category": "Education"},
+                {"name": "Streaks", "description": "Build positive habits", "category": "Productivity"}
+            ],
+            'social': [
+                "Send a 'thinking of you' message to a friend",
+                "Comment positively on someone's post",
+                "Schedule a catch-up call",
+                "Join an online community around your interests"
+            ],
+            'self_care': [
+                "Drink a full glass of water",
+                "Step outside for fresh air",
+                "Do a quick body scan meditation",
+                "Apply hand cream or lotion mindfully"
+            ]
+        }
+    }
+
+    def get_recommendations(self, emotion: str, context: str = "", 
+                           source_types: Optional[List[str]] = None,
+                           count: int = 3) -> Dict:
+        """
+        Get multi-source recommendations based on emotion
+
+        Args:
+            emotion: Detected emotion (joy, anger, sadness, fear, neutral)
+            context: Optional context text (for future enhancement)
+            source_types: Optional list of specific source types to include
+            count: Number of recommendations per source type
+
+        Returns:
+            Dictionary with recommendations from multiple sources
+        """
+        # Get all recommendations for this emotion
+        emotion_recs = self.RECOMMENDATIONS.get(emotion, self.RECOMMENDATIONS['neutral'])
+
+        # Default source types
+        if source_types is None:
+            source_types = ['music', 'podcast', 'video', 'activity', 'self_care']
+
+        # Build response
+        recommendations = {
+            'emotion': emotion,
+            'sources': {}
+        }
+
+        for source_type in source_types:
+            if source_type in emotion_recs:
+                items = emotion_recs[source_type]
+                # Select random items if more available than count
+                if len(items) > count:
+                    selected = random.sample(items, count)
+                else:
+                    selected = items
+                recommendations['sources'][source_type] = selected
+
+        # Add quick action (single immediate recommendation)
+        if 'activity' in emotion_recs:
+            recommendations['quick_action'] = random.choice(emotion_recs['activity'])
+
+        # Add send_message suggestion (for sharing)
+        if 'social' in emotion_recs:
+            recommendations['send_message'] = random.choice(emotion_recs['social'])
+
+        return recommendations
+
+    def get_quick_recommendation(self, emotion: str) -> Dict:
+        """Get a single quick recommendation"""
+        emotion_recs = self.RECOMMENDATIONS.get(emotion, self.RECOMMENDATIONS['neutral'])
+
+        # Prioritize activities for quick action
+        if 'activity' in emotion_recs:
+            activity = random.choice(emotion_recs['activity'])
+            return {
+                'type': 'activity',
+                'title': activity['title'],
+                'description': activity['description'],
+                'duration': activity.get('duration', '5-10 min'),
+                'emotion': emotion
+            }
+
+        return {'type': 'none', 'emotion': emotion}
+
+    def get_all_sources(self) -> List[str]:
+        """Get list of all available source types"""
+        return ['music', 'podcast', 'video', 'activity', 'book', 'app', 'social', 'self_care']
+
+    def get_emotion_sources(self, emotion: str) -> List[str]:
+        """Get available source types for a specific emotion"""
+        emotion_recs = self.RECOMMENDATIONS.get(emotion, self.RECOMMENDATIONS['neutral'])
+        return list(emotion_recs.keys())
+
+
+# Singleton instance
+_recommender = None
+
+
+def get_recommender() -> MultiSourceRecommender:
+    """Get or create MultiSourceRecommender singleton"""
+    global _recommender
+    if _recommender is None:
+        _recommender = MultiSourceRecommender()
+    return _recommender
+
+
+def get_recommendations(emotion: str, context: str = "", 
+                       source_types: Optional[List[str]] = None) -> Dict:
+    """
+    Convenience function to get multi-source recommendations
+
+    Args:
+        emotion: Detected emotion
+        context: Optional context
+        source_types: Optional list of source types
+
+    Returns:
+        Multi-source recommendation dictionary
+    """
+    return get_recommender().get_recommendations(emotion, context, source_types)
+
+
+def get_quick_recommendation(emotion: str) -> Dict:
+    """Get a single quick recommendation"""
+    return get_recommender().get_quick_recommendation(emotion)
+
+
+if __name__ == "__main__":
+    import json
+
+    # Test the recommender
+    recommender = MultiSourceRecommender()
+
+    print("=" * 70)
+    print("Multi-Source Recommendation Engine Test")
+    print("=" * 70)
+
+    for emotion in ['joy', 'anger', 'sadness', 'fear', 'neutral']:
+        print(f"\n{'='*70}")
+        print(f"EMOTION: {emotion.upper()}")
+        print(f"{'='*70}")
+
+        recs = recommender.get_recommendations(emotion, count=2)
+
+        print(f"\n📱 Quick Action: {recs['quick_action']['title']}")
+        print(f"   {recs['quick_action']['description']}")
+
+        print(f"\n💬 Social: {recs['send_message']}")
+
+        for source_type, items in recs['sources'].items():
+            print(f"\n{source_type.upper()}:")
+            for item in items:
+                if source_type == 'music':
+                    print(f"  🎵 {item['title']} - {item['description']}")
+                elif source_type == 'podcast':
+                    print(f"  🎧 {item['title']}: {item['episode']}")
+                    print(f"     {item['description']}")
+                elif source_type == 'video':
+                    print(f"  📺 {item['title']} ({item['platform']}, {item['duration']})")
+                    print(f"     {item['description']}")
+                elif source_type == 'activity':
+                    print(f"  ✨ {item['title']} ({item['duration']}, {item['effort']} effort)")
+                    print(f"     {item['description']}")
+                elif source_type == 'self_care':
+                    print(f"  💆 {item}")
+                else:
+                    print(f"  📌 {item}")

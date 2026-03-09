@@ -1,5 +1,4 @@
-'use client';
-
+"use client";
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Mic, MicOff, Loader2, Sparkles, Zap } from 'lucide-react';
@@ -105,6 +104,8 @@ export default function ChatContainer() {
           color: result.color,
           recommendations: result.recommendations,
           source: result.source,
+          multi_source: result.multi_source,
+          external_resources: result.external_resources,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, recMessage]);
@@ -278,6 +279,8 @@ export default function ChatContainer() {
                   emotion={message.emotion!}
                   color={message.color!}
                   recommendations={message.recommendations!}
+                  multi_source={message.multi_source}
+                  external_resources={message.external_resources}
                   source={message.source}
                 />
               ) : (

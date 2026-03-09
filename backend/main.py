@@ -13,8 +13,11 @@ from dotenv import load_dotenv
 
 # Import modules
 from nlp.emotion_detector import detect_emotion
+from nlp.hmm_classifier import get_classifier as get_hmm_classifier
 from ai.groq_agent import get_ai_recommendations, get_agent
 from ai.fallback_rules import get_recommendations as get_rule_recommendations
+from ai.multi_source_recommender import get_recommendations as get_multi_source_recommendations
+from ai.external_resource_recommender import get_external_recommendations
 from speech.stt import transcribe_speech
 
 # Load environment variables
@@ -41,11 +44,13 @@ app.add_middleware(
 class TextAnalysisRequest(BaseModel):
     text: str
     use_ai: Optional[bool] = True
+    method: Optional[str] = "vader"  # "vader", "hmm", or "hybrid"
 
 
 class VoiceAnalysisRequest(BaseModel):
     audio_base64: str
     use_ai: Optional[bool] = True
+    method: Optional[str] = "vader"
 
 
 class AnalysisResponse(BaseModel):
@@ -57,11 +62,15 @@ class AnalysisResponse(BaseModel):
     recommendations: Dict[str, str]
     source: str  # "ai" or "rules"
     scores: Optional[Dict[str, float]] = None
+    method: Optional[str] = "vader"
+    multi_source: Optional[Dict[str, Any]] = None  # Multi-source recommendations
+    external_resources: Optional[Dict[str, Any]] = None  # External API recommendations
 
 
 class HealthResponse(BaseModel):
     status: str
     ai_available: bool
+    hmm_available: bool
     message: str
 
 
@@ -85,9 +94,18 @@ async def health_check():
     """Check API health and AI availability"""
     ai_available = get_agent().is_available()
     
+    # Check HMM model availability
+    hmm_available = False
+    try:
+        hmm_classifier = get_hmm_classifier()
+        hmm_available = hmm_classifier.is_trained
+    except Exception:
+        hmm_available = False
+
     return {
         "status": "ok",
         "ai_available": ai_available,
+        "hmm_available": hmm_available,
         "message": "AI recommendations enabled" if ai_available else "Using rule-based recommendations"
     }
 
@@ -96,41 +114,95 @@ async def health_check():
 async def detect_from_text(request: TextAnalysisRequest):
     """
     Detect emotion from text and get recommendations
-    
+
     Args:
-        request: TextAnalysisRequest with text and use_ai flag
-        
+        request: TextAnalysisRequest with text, use_ai flag, and method
+
     Returns:
         AnalysisResponse with emotion, confidence, and recommendations
     """
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    # 1. Detect emotion using specified method
+    method = request.method.lower()
     
-    # 1. Detect emotion using NLTK
-    emotion_result = detect_emotion(request.text)
-    
+    if method == "hmm":
+        # Use HMM classifier
+        try:
+            hmm_classifier = get_hmm_classifier()
+            if not hmm_classifier.is_trained:
+                # Fallback to VADER if HMM not trained
+                emotion_result = detect_emotion(request.text)
+                emotion_result['method'] = 'vader'
+                method = 'vader'
+            else:
+                emotion_result = hmm_classifier.detect(request.text)
+        except Exception:
+            emotion_result = detect_emotion(request.text)
+            emotion_result['method'] = 'vader'
+            method = 'vader'
+    elif method == "hybrid":
+        # Use both VADER and HMM, combine results
+        vader_result = detect_emotion(request.text)
+        try:
+            hmm_classifier = get_hmm_classifier()
+            if hmm_classifier.is_trained:
+                hmm_result = hmm_classifier.detect(request.text)
+                # If both agree, increase confidence
+                if vader_result['emotion'] == hmm_result['emotion']:
+                    vader_result['confidence'] = min(1.0, vader_result['confidence'] + 0.1)
+                else:
+                    # Use VADER but note disagreement
+                    vader_result['hmm_emotion'] = hmm_result['emotion']
+                    vader_result['hmm_confidence'] = hmm_result['confidence']
+        except Exception:
+            pass
+        emotion_result = vader_result
+        emotion_result['method'] = 'hybrid'
+        method = 'hybrid'
+    else:
+        # Default to VADER
+        emotion_result = detect_emotion(request.text)
+        emotion_result['method'] = 'vader'
+        method = 'vader'
+
     # 2. Get recommendations (AI or Rules)
     recommendations = {}
     source = "rules"
-    
+
     if request.use_ai:
         # Try AI first
         ai_recs = get_ai_recommendations(
             emotion_result['emotion'],
             request.text
         )
-        
+
         if ai_recs:
             recommendations = ai_recs
             source = "ai"
         else:
-            # Fallback to rules
-            recommendations = get_rule_recommendations(emotion_result['emotion'])
+            # Fallback to rules (now includes multi-source)
+            recommendations = get_rule_recommendations(emotion_result['emotion'], request.text)
             source = "rules"
     else:
-        # Use rules only
-        recommendations = get_rule_recommendations(emotion_result['emotion'])
-    
+        # Use rules only (includes multi-source)
+        recommendations = get_rule_recommendations(emotion_result['emotion'], request.text)
+
+    # Get multi-source recommendations
+    multi_source_recs = get_multi_source_recommendations(
+        emotion=emotion_result['emotion'],
+        context=request.text,
+        source_types=['music', 'podcast', 'video', 'activity', 'self_care']
+    )
+
+    # Get external resource recommendations (YouTube, Spotify, etc.)
+    external_recs = get_external_recommendations(
+        emotion=emotion_result['emotion'],
+        context=request.text,
+        sources=['youtube', 'spotify', 'podcast', 'ted']
+    )
+
     # 3. Build response
     return {
         "text": request.text,
@@ -140,7 +212,10 @@ async def detect_from_text(request: TextAnalysisRequest):
         "color": emotion_result['color'],
         "recommendations": recommendations,
         "source": source,
-        "scores": emotion_result['scores']
+        "scores": emotion_result.get('scores'),
+        "method": method,
+        "multi_source": multi_source_recs,
+        "external_resources": external_recs
     }
 
 
@@ -148,58 +223,90 @@ async def detect_from_text(request: TextAnalysisRequest):
 async def detect_from_voice(request: VoiceAnalysisRequest):
     """
     Detect emotion from voice audio and get recommendations
-    
+
     Args:
         request: VoiceAnalysisRequest with base64-encoded audio
-        
+
     Returns:
         AnalysisResponse with transcribed text, emotion, and recommendations
     """
     if not request.audio_base64.strip():
         raise HTTPException(status_code=400, detail="Audio cannot be empty")
-    
+
     # 1. Transcribe speech to text
     try:
         transcribed_text = transcribe_speech(
             audio_data=None,  # Will use base64 internally
             from_mic=False
         )
-        
+
         # Use the base64 method directly
         from speech.stt import get_stt
         transcribed_text = get_stt().transcribe_from_base64(request.audio_base64)
-        
+
         if not transcribed_text:
             raise HTTPException(status_code=400, detail="Could not transcribe audio")
-            
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+    # 2. Detect emotion using specified method
+    method = request.method.lower() if hasattr(request, 'method') else "vader"
     
-    # 2. Detect emotion using NLTK
-    emotion_result = detect_emotion(transcribed_text)
-    
+    if method == "hmm":
+        try:
+            hmm_classifier = get_hmm_classifier()
+            if not hmm_classifier.is_trained:
+                emotion_result = detect_emotion(transcribed_text)
+                emotion_result['method'] = 'vader'
+                method = 'vader'
+            else:
+                emotion_result = hmm_classifier.detect(transcribed_text)
+        except Exception:
+            emotion_result = detect_emotion(transcribed_text)
+            emotion_result['method'] = 'vader'
+            method = 'vader'
+    else:
+        emotion_result = detect_emotion(transcribed_text)
+        emotion_result['method'] = 'vader'
+        method = 'vader'
+
     # 3. Get recommendations (AI or Rules)
     recommendations = {}
     source = "rules"
-    
+
     if request.use_ai:
         # Try AI first
         ai_recs = get_ai_recommendations(
             emotion_result['emotion'],
             transcribed_text
         )
-        
+
         if ai_recs:
             recommendations = ai_recs
             source = "ai"
         else:
-            # Fallback to rules
-            recommendations = get_rule_recommendations(emotion_result['emotion'])
+            # Fallback to rules (now includes multi-source)
+            recommendations = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
             source = "rules"
     else:
-        # Use rules only
-        recommendations = get_rule_recommendations(emotion_result['emotion'])
-    
+        # Use rules only (includes multi-source)
+        recommendations = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
+
+    # Get multi-source recommendations
+    multi_source_recs = get_multi_source_recommendations(
+        emotion=emotion_result['emotion'],
+        context=transcribed_text,
+        source_types=['music', 'podcast', 'video', 'activity', 'self_care']
+    )
+
+    # Get external resource recommendations (YouTube, Spotify, etc.)
+    external_recs = get_external_recommendations(
+        emotion=emotion_result['emotion'],
+        context=transcribed_text,
+        sources=['youtube', 'spotify', 'podcast', 'ted']
+    )
+
     # 4. Build response
     return {
         "text": transcribed_text,
@@ -209,7 +316,10 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         "color": emotion_result['color'],
         "recommendations": recommendations,
         "source": source,
-        "scores": emotion_result['scores']
+        "scores": emotion_result.get('scores'),
+        "method": method,
+        "multi_source": multi_source_recs,
+        "external_resources": external_recs
     }
 
 

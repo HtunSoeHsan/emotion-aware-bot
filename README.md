@@ -8,7 +8,10 @@ An intelligent chatbot that detects emotions from text or speech and provides pe
 
 - **Emotion Detection**: Analyzes text/speech to detect emotions (Joy, Anger, Sadness, Fear, Neutral)
 - **Dual Input**: Support for both text and voice (speech-to-text)
-- **Smart Recommendations**: AI-powered suggestions using Ollama LLM + rule-based fallback
+- **Multi-Source Recommendations**: Personalized suggestions across 8 categories:
+  - 🎵 Music, 🎧 Podcasts, 📺 Videos, ✨ Activities
+  - 📚 Books, 📱 Apps, 👥 Social, 💆 Self-Care
+- **Smart AI**: Ollama LLM + HMM + VADER + rule-based fallback
 - **Modern UI**: Built with Next.js 14, Tailwind CSS, and shadcn/ui
 - **Real-time Chat**: Interactive chatbot interface with emotion-colored responses
 - **Privacy-First**: Can run 100% locally (no external APIs required)
@@ -110,9 +113,20 @@ Open [http://localhost:4001](http://localhost:4001)
 ### Example Request (Text)
 
 ```bash
+# Default (VADER)
 curl -X POST http://localhost:8000/api/detect/text \
   -H "Content-Type: application/json" \
   -d '{"text": "I am so happy today!", "use_ai": true}'
+
+# Using HMM
+curl -X POST http://localhost:8000/api/detect/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "I am so happy today!", "use_ai": true, "method": "hmm"}'
+
+# Hybrid (VADER + HMM)
+curl -X POST http://localhost:8000/api/detect/text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "I am so happy today!", "use_ai": true, "method": "hybrid"}'
 ```
 
 ### Example Response
@@ -151,6 +165,7 @@ curl -X POST http://localhost:8000/api/detect/text \
 ### Backend
 - **FastAPI** - Modern Python web framework
 - **NLTK** - Natural Language Toolkit (VADER sentiment)
+- **hmmlearn** - Hidden Markov Models for sequence-based detection
 - **SpeechRecognition** - Speech-to-text conversion
 - **Ollama** - Local LLM for smart recommendations
 
@@ -158,19 +173,23 @@ curl -X POST http://localhost:8000/api/detect/text \
 
 ### NLP Techniques Used
 1. **VADER Sentiment Analysis** - Rule-based sentiment scoring
-2. **Tokenization** - Breaking text into words
-3. **Stopword Removal** - Filtering common words
-4. **Semantic Analysis** - WordNet-based similarity (optional)
+2. **Hidden Markov Models (HMM)** - Sequence-based probabilistic emotion detection
+3. **Tokenization** - Breaking text into words
+4. **Stopword Removal** - Filtering common words
+5. **Hash-based Word Embeddings** - Feature extraction for HMM
+6. **Semantic Analysis** - WordNet-based similarity (optional)
 
 ### AI/ML Components
 1. **Rule-based Classifier** - Emotion detection from sentiment scores
-2. **LLM Integration** - Ollama/Llama2 for contextual recommendations
-3. **Fallback System** - Rule-based backup when AI fails
+2. **HMM Classifier** - Gaussian HMM with 5 hidden states per emotion
+3. **LLM Integration** - Ollama/Llama2 for contextual recommendations
+4. **Fallback System** - Rule-based backup when AI fails
 
 ### Demo Tips
 - Show both text and voice input
 - Toggle AI on/off to compare recommendations
-- Explain the hybrid architecture (NLTK + LLM)
+- Compare VADER vs HMM results using `method` parameter
+- Explain the hybrid architecture (NLTK + HMM + LLM)
 
 ## 📝 License
 

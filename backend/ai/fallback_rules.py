@@ -1,116 +1,68 @@
 """
 Rule-based Recommendation Engine
-Fallback system when AI agent is unavailable
+Now uses Multi-Source Recommendation System
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
+from .multi_source_recommender import MultiSourceRecommender, get_recommender as get_multi_source_recommender
 
 
 class RuleBasedRecommender:
-    """Generate recommendations using predefined rules"""
-    
-    # Emotion-specific recommendations
-    RECOMMENDATIONS = {
-        'joy': [
-            {
-                'send_message': "Share this happiness with someone! 🌟",
-                'action': "Write this moment in your journal 📝"
-            },
-            {
-                'send_message': "I'm having a great day! Hope you are too! ✨",
-                'action': "Celebrate by doing something you love 🎉"
-            },
-            {
-                'send_message': "Feeling amazing today! 💫",
-                'action': "Take a photo to remember this feeling 📸"
-            }
-        ],
-        'anger': [
-            {
-                'send_message': "I need some space right now",
-                'action': "Take 5 deep breaths 🧘"
-            },
-            {
-                'send_message': "Let's talk about this later when I'm calmer",
-                'action': "Go for a short walk 🚶"
-            },
-            {
-                'send_message': "I'm feeling frustrated and need time",
-                'action': "Write down what's bothering you 📝"
-            }
-        ],
-        'sadness': [
-            {
-                'send_message': "Can we talk? I'm not doing well",
-                'action': "Call a friend or family member 📞"
-            },
-            {
-                'send_message': "Having a tough day. Could use some support",
-                'action': "Practice self-care: warm tea, cozy blanket ☕"
-            },
-            {
-                'send_message': "I could really use a friend right now",
-                'action': "Listen to uplifting music 🎵"
-            }
-        ],
-        'fear': [
-            {
-                'send_message': "I'm feeling anxious about something",
-                'action': "Practice grounding: 5-4-3-2-1 technique 🌿"
-            },
-            {
-                'send_message': "Can you help me talk through my worries?",
-                'action': "Do a quick meditation or breathing exercise 🧘"
-            },
-            {
-                'send_message': "I'm nervous and could use some reassurance",
-                'action': "Remind yourself: You've got this! 💪"
-            }
-        ],
-        'neutral': [
-            {
-                'send_message': "Hey! How's your day going? 👋",
-                'action': "Take a moment to appreciate the present 🌸"
-            },
-            {
-                'send_message': "Just checking in! Hope you're doing well",
-                'action': "Do something small that brings joy ☕"
-            },
-            {
-                'send_message': "Having an okay day. How about you?",
-                'action': "Stay positive and keep going! 🌟"
-            }
-        ]
-    }
-    
+    """Generate recommendations using multi-source rule-based system"""
+
+    def __init__(self):
+        """Initialize with multi-source recommender"""
+        self.multi_source = get_multi_source_recommender()
+
     def get_recommendations(self, emotion: str, context: str = "") -> Dict:
         """
-        Get recommendations based on emotion
-        
+        Get multi-source recommendations based on emotion
+
         Args:
             emotion: Detected emotion (joy, anger, sadness, fear, neutral)
-            context: Optional context text (not used in rule-based, but kept for API compatibility)
-            
+            context: Optional context text
+
         Returns:
-            Dictionary with send_message and action
+            Dictionary with recommendations from multiple sources
         """
-        # Get recommendations for this emotion
-        recs = self.RECOMMENDATIONS.get(emotion, self.RECOMMENDATIONS['neutral'])
-        
-        # Return first recommendation (can be enhanced with context matching)
-        return recs[0]
-    
-    def get_all_recommendations(self, emotion: str) -> List[Dict]:
+        # Get multi-source recommendations
+        recs = self.multi_source.get_recommendations(
+            emotion=emotion,
+            context=context,
+            source_types=['music', 'podcast', 'video', 'activity', 'self_care'],
+            count=2
+        )
+
+        # Format for backward compatibility
+        formatted = {
+            'send_message': recs.get('send_message', "Reach out to someone you trust"),
+            'action': recs.get('quick_action', {}).get('description', "Take a moment for yourself"),
+            'sources': recs.get('sources', {}),
+            'quick_action': recs.get('quick_action'),
+            'emotion': recs.get('emotion', emotion)
+        }
+
+        return formatted
+
+    def get_all_recommendations(self, emotion: str) -> Dict:
         """
         Get all available recommendations for an emotion
-        
+
         Args:
             emotion: Emotion type
-            
+
         Returns:
-            List of all recommendation pairs
+            Dictionary with all recommendation sources
         """
-        return self.RECOMMENDATIONS.get(emotion, self.RECOMMENDATIONS['neutral'])
+        return self.multi_source.get_recommendations(emotion, count=3)
+
+    def get_quick_recommendation(self, emotion: str) -> Dict:
+        """Get a single quick recommendation"""
+        return self.multi_source.get_quick_recommendation(emotion)
+
+    def get_all_sources(self) -> List[str]:
+        """Get list of all available source types"""
+        return self.multi_source.get_all_sources()
 
 
 # Singleton instance

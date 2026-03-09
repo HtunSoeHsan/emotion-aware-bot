@@ -12,11 +12,7 @@ interface RecommendationCardProps {
   recommendations: {
     send_message: string;
     action: string;
-    sources?: any;
-    quick_action?: any;
   };
-  multi_source?: any;
-  external_resources?: any;
   source?: 'ai' | 'rules';
 }
 
