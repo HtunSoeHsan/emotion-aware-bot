@@ -172,6 +172,11 @@ export default function ChatContainer() {
       // Call API
       const result = await analyzeText(messageText, useAI);
 
+      // Debug: Log the full API response
+      console.log('=== API Response ===');
+      console.log('result.multi_source:', result.multi_source);
+      console.log('result.external_resources:', result.external_resources);
+
       // Add bot response with emotion
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -423,6 +428,8 @@ export default function ChatContainer() {
                         color={message.color!}
                         recommendations={message.recommendations!}
                         source={message.source}
+                        multi_source={message.multi_source}
+                        external_resources={message.external_resources}
                       />
                     ) : (
                       <MessageBubble message={message} />
