@@ -1,12 +1,39 @@
-"use client";
-import { useState, useRef, useEffect } from 'react';
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, MicOff, Loader2, Sparkles, Zap } from 'lucide-react';
+import {
+  Send,
+  Mic,
+  MicOff,
+  Loader2,
+  Sparkles,
+  Zap,
+  MessageSquare,
+  Plus,
+  Trash2,
+  Menu,
+  X,
+  MessageCircle,
+  Smile,
+  Frown,
+  Meh,
+  Heart,
+  ThumbsUp
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble, { Message } from './MessageBubble';
 import RecommendationCard from './RecommendationCard';
 import { analyzeText, checkHealth } from '@/lib/api';
+
+// Chat history item
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
+}
 
 export default function ChatContainer() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -15,10 +42,14 @@ export default function ChatContainer() {
   const [isListening, setIsListening] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
   const [useAI, setUseAI] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Scroll to bottom when new messages arrive
+  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -61,7 +92,66 @@ export default function ChatContainer() {
         setIsListening(false);
       };
     }
+
+    // Create initial chat session
+    createNewChat();
   }, []);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [inputText]);
+
+  // Create new chat session
+  const createNewChat = () => {
+    const newChat: ChatSession = {
+      id: Date.now().toString(),
+      title: 'New Conversation',
+      messages: [],
+      createdAt: new Date(),
+    };
+    setChatHistory((prev) => [newChat, ...prev]);
+    setCurrentChatId(newChat.id);
+    setMessages([]);
+  };
+
+  // Delete chat session
+  const deleteChat = (chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setChatHistory((prev) => prev.filter((chat) => chat.id !== chatId));
+    if (currentChatId === chatId) {
+      createNewChat();
+    }
+  };
+
+  // Load chat session
+  const loadChat = (chatId: string) => {
+    const chat = chatHistory.find((c) => c.id === chatId);
+    if (chat) {
+      setCurrentChatId(chatId);
+      setMessages(chat.messages);
+    }
+  };
+
+  // Save current chat to history
+  const saveChat = () => {
+    if (!currentChatId) return;
+    
+    setChatHistory((prev) =>
+      prev.map((chat) =>
+        chat.id === currentChatId
+          ? {
+              ...chat,
+              messages,
+              title: messages[0]?.text?.slice(0, 30) + '...' || 'New Conversation',
+            }
+          : chat
+      )
+    );
+  };
 
   const handleSend = async (text?: string) => {
     const messageText = text || inputText.trim();
@@ -104,12 +194,16 @@ export default function ChatContainer() {
           color: result.color,
           recommendations: result.recommendations,
           source: result.source,
+          count: result.count,
           multi_source: result.multi_source,
           external_resources: result.external_resources,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, recMessage]);
       }
+
+      // Save to history
+      setTimeout(saveChat, 1000);
     } catch (error) {
       // Add error message
       const errorMessage: Message = {
@@ -139,274 +233,317 @@ export default function ChatContainer() {
     }
   };
 
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200"
-    >
-      {/* Chat Header - Enhanced with glassmorphism */}
-      <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 px-6 py-4 overflow-hidden">
-        {/* Animated background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-          <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2 animate-pulse delay-1000"></div>
-        </div>
-        
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-white font-semibold text-lg">EmotionBot</h2>
-              <p className="text-indigo-100 text-xs flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${aiAvailable ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></span>
-                {aiAvailable ? 'AI-powered recommendations active' : 'Rule-based mode'}
-              </p>
-            </div>
-          </div>
-          
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setUseAI(!useAI)}
-              className="text-white hover:bg-white/20 backdrop-blur-sm border border-white/20"
-              disabled={!aiAvailable}
-            >
-              {useAI ? (
-                <>
-                  <Sparkles className="w-4 h-4 mr-1.5" />
-                  <span className="hidden sm:inline">AI On</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 mr-1.5" />
-                  <span className="hidden sm:inline">Rules</span>
-                </>
-              )}
-            </Button>
-          </motion.div>
-        </div>
-      </div>
+  const emotionIcons = {
+    joy: <Smile className="w-4 h-4" />,
+    anger: <Frown className="w-4 h-4" />,
+    sadness: <Heart className="w-4 h-4" />,
+    fear: <Zap className="w-4 h-4" />,
+    neutral: <Meh className="w-4 h-4" />,
+  };
 
-      {/* Messages Area - Enhanced */}
-      <div className="h-[550px] overflow-y-auto p-6 space-y-4 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
-        <AnimatePresence mode="wait">
-          {messages.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="text-center py-20"
-            >
-              {/* Animated Hero Illustration */}
-              <div className="relative inline-block mb-6">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur-2xl rounded-full"></div>
-                <motion.div 
-                  className="relative text-7xl"
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                >
-                  🧠
-                </motion.div>
-              </div>
-              
-              <h3 className="text-xl font-semibold text-slate-800 mb-3">
-                Welcome to Emotion-Aware AI
-              </h3>
-              <p className="text-slate-600 max-w-md mx-auto mb-8 leading-relaxed">
-                I can detect your emotions from text or voice and provide personalized recommendations.
-              </p>
-              
-              {/* Example Prompts */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
-                {[
-                  { emoji: '😊', text: "I just got promoted!", emotion: 'Joy' },
-                  { emoji: '😠', text: "This is so frustrating!", emotion: 'Anger' },
-                  { emoji: '😢', text: "I feel really lonely", emotion: 'Sadness' },
-                  { emoji: '😨', text: "I'm worried about tomorrow", emotion: 'Fear' },
-                ].map((example, index) => (
-                  <motion.button
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleSend(example.text)}
-                    className="p-4 bg-white border border-slate-200 rounded-xl text-left hover:border-indigo-300 hover:shadow-md transition-all duration-200 group"
+  return (
+    <div className="flex h-screen bg-white">
+      {/* Sidebar - ChatGPT Style */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.aside
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 280, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-slate-900 flex-shrink-0 overflow-hidden"
+          >
+            <div className="flex flex-col h-full p-3">
+              {/* New Chat Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={createNewChat}
+                className="flex items-center gap-3 px-4 py-3 mb-4 text-white border border-slate-700 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="text-sm font-medium">New chat</span>
+              </motion.button>
+
+              {/* Chat History */}
+              <div className="flex-1 overflow-y-auto space-y-2">
+                <p className="text-xs text-slate-500 px-3 mb-2">Recent Conversations</p>
+                {chatHistory.map((chat) => (
+                  <motion.div
+                    key={chat.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                    onClick={() => loadChat(chat.id)}
+                    className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors ${
+                      currentChatId === chat.id ? 'bg-slate-800' : ''
+                    }`}
                   >
-                    <span className="text-2xl mb-1 block">{example.emoji}</span>
-                    <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600">
-                      {example.text}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
-                  </motion.button>
+                    <MessageSquare className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-300 flex-1 truncate">
+                      {chat.title}
+                    </span>
+                    <button
+                      onClick={(e) => deleteChat(chat.id, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-700 rounded transition-all"
+                    >
+                      <Trash2 className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </motion.div>
                 ))}
               </div>
-              
-              {/* Voice Input CTA */}
-              <div className="mt-8">
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="inline-flex items-center gap-2 text-slate-500 text-sm"
-                >
-                  <Mic className="w-4 h-4" />
-                  <span>Or click the microphone to speak</span>
-                </motion.div>
+
+              {/* User Profile */}
+              <div className="pt-3 border-t border-slate-800">
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                    U
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">User</p>
+                    <p className="text-xs text-slate-500">Free Plan</p>
+                  </div>
+                </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Messages with animations */}
-        <AnimatePresence>
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-            >
-              {message.type === 'recommendation' ? (
-                <RecommendationCard
-                  emotion={message.emotion!}
-                  color={message.color!}
-                  recommendations={message.recommendations!}
-                  multi_source={message.multi_source}
-                  external_resources={message.external_resources}
-                  source={message.source}
-                />
-              ) : (
-                <MessageBubble message={message} />
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {/* Enhanced Loading State */}
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center gap-3 text-slate-600"
-          >
-            <div className="relative">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
-              <div className="absolute inset-0 bg-indigo-600/20 rounded-full animate-ping"></div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-medium">Analyzing emotion</span>
-              <span className="flex gap-1">
-                <motion.span
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="w-1 h-1 bg-indigo-600 rounded-full"
-                ></motion.span>
-                <motion.span
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                  className="w-1 h-1 bg-indigo-600 rounded-full"
-                ></motion.span>
-                <motion.span
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-                  className="w-1 h-1 bg-indigo-600 rounded-full"
-                ></motion.span>
-              </span>
-            </div>
-          </motion.div>
+          </motion.aside>
         )}
+      </AnimatePresence>
 
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area - Enhanced */}
-      <div className="border-t border-slate-200 p-4 bg-white/80 backdrop-blur-sm">
-        <div className="flex gap-3 max-w-4xl mx-auto">
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-3">
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              onClick={toggleListening}
-              className={`shrink-0 transition-all duration-300 ${
-                isListening 
-                  ? 'animate-pulse bg-red-50 border-red-300 shadow-lg shadow-red-200' 
-                  : 'hover:bg-slate-50'
-              }`}
-              disabled={isLoading}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover:bg-slate-100"
             >
-              {isListening ? (
-                <MicOff className="w-5 h-5 text-red-500" />
-              ) : (
-                <Mic className="w-5 h-5 text-slate-600" />
-              )}
+              {sidebarOpen ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
             </Button>
-          </motion.div>
-
-          <div className="flex-1 relative">
-            <Input
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={isListening ? 'Listening...' : 'Type a message or speak...'}
-              disabled={isLoading || isListening}
-              className="flex-1 pr-12 transition-all duration-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            {inputText.trim() && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={() => setInputText('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <span className="text-xs font-medium">✕</span>
-              </motion.button>
-            )}
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Emotion-Aware AI</h2>
+              <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${aiAvailable ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></span>
+                {aiAvailable ? 'Groq AI Powered' : 'Rule-based mode'}
+              </p>
+            </div>
           </div>
 
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              onClick={() => handleSend()}
-              disabled={isLoading || !inputText.trim()}
-              className={`shrink-0 transition-all duration-300 ${
-                inputText.trim()
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-200'
-                  : ''
-              }`}
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </Button>
-          </motion.div>
-        </div>
-        
-        {/* Voice Recording Indicator */}
-        {isListening && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 text-center"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setUseAI(!useAI)}
+            className="border-slate-300 hover:bg-slate-50"
+            disabled={!aiAvailable}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-full">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-red-700 font-medium">Recording... Click mic to stop</span>
+            {useAI ? (
+              <>
+                <Sparkles className="w-4 h-4 mr-2 text-indigo-600" />
+                AI Mode
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2 text-amber-600" />
+                Fast Mode
+              </>
+            )}
+          </Button>
+        </header>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-6 bg-white">
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center">
+              {/* ChatGPT-style Welcome */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center max-w-2xl"
+              >
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl">
+                  <MessageCircle className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-3">
+                  How can I help you today?
+                </h3>
+                <p className="text-slate-600 mb-8 leading-relaxed">
+                  I can detect your emotions and provide personalized recommendations.
+                  Try sharing how you're feeling!
+                </p>
+
+                {/* Example Prompts Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    { emoji: '😊', text: "I just got amazing news!", emotion: 'Share joy' },
+                    { emoji: '😠', text: "This is so frustrating!", emotion: 'Express anger' },
+                    { emoji: '😢', text: "I'm feeling down today", emotion: 'Need support' },
+                    { emoji: '😨', text: "I'm worried about something", emotion: 'Share fear' },
+                  ].map((example, index) => (
+                    <motion.button
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleSend(example.text)}
+                      className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md transition-all duration-200 group"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{example.emoji}</span>
+                        <div>
+                          <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600">
+                            {example.text}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
+                        </div>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
-        )}
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-6">
+              <AnimatePresence>
+                {messages.map((message) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {message.type === 'recommendation' ? (
+                      <RecommendationCard
+                        emotion={message.emotion!}
+                        color={message.color!}
+                        recommendations={message.recommendations!}
+                        source={message.source}
+                      />
+                    ) : (
+                      <MessageBubble message={message} />
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-slate-600">Analyzing</span>
+                    <span className="flex gap-1">
+                      <motion.span
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                      ></motion.span>
+                      <motion.span
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                      ></motion.span>
+                      <motion.span
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                      ></motion.span>
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Input Area - ChatGPT Style */}
+        <div className="border-t border-slate-200 p-4 bg-white">
+          <div className="max-w-3xl mx-auto">
+            <div className="relative flex items-end gap-2 bg-slate-50 border border-slate-300 rounded-2xl p-2 shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200 transition-all">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleListening}
+                className={`shrink-0 rounded-xl ${
+                  isListening
+                    ? 'bg-red-100 hover:bg-red-200 text-red-600'
+                    : 'hover:bg-slate-200'
+                }`}
+                disabled={isLoading}
+              >
+                {isListening ? (
+                  <MicOff className="w-5 h-5" />
+                ) : (
+                  <Mic className="w-5 h-5" />
+                )}
+              </Button>
+
+              <textarea
+                ref={textareaRef}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Share how you're feeling..."
+                disabled={isLoading || isListening}
+                rows={1}
+                className="flex-1 bg-transparent border-0 focus:ring-0 resize-none py-3 px-2 text-slate-800 placeholder:text-slate-400 max-h-[200px]"
+                style={{ minHeight: '44px' }}
+              />
+
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  onClick={() => handleSend()}
+                  disabled={isLoading || !inputText.trim()}
+                  className={`shrink-0 rounded-xl h-11 w-11 p-0 ${
+                    inputText.trim()
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg'
+                      : 'bg-slate-300'
+                  }`}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                </Button>
+              </motion.div>
+            </div>
+
+            {/* Voice Recording Indicator */}
+            {isListening && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 text-center"
+              >
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-full">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-red-700 font-medium">
+                    Listening... Click mic to stop
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            <p className="text-xs text-center text-slate-500 mt-3">
+              Emotion-Aware AI can make mistakes. Consider checking important information.
+            </p>
+          </div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

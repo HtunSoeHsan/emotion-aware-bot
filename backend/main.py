@@ -6,7 +6,7 @@ Main server with endpoints for emotion detection and recommendations
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -59,8 +59,9 @@ class AnalysisResponse(BaseModel):
     confidence: float
     emoji: str
     color: str
-    recommendations: Dict[str, str]
+    recommendations: Any  # Can be dict (multi-source) or list (dev branch)
     source: str  # "ai" or "rules"
+    count: Optional[int] = None  # Number of recommendations (dev branch)
     scores: Optional[Dict[str, float]] = None
     method: Optional[str] = "vader"
     multi_source: Optional[Dict[str, Any]] = None  # Multi-source recommendations
@@ -168,8 +169,9 @@ async def detect_from_text(request: TextAnalysisRequest):
         method = 'vader'
 
     # 2. Get recommendations (AI or Rules)
-    recommendations = {}
+    recommendations_result: Any = {}
     source = "rules"
+    rec_count = 0
 
     if request.use_ai:
         # Try AI first
@@ -178,16 +180,36 @@ async def detect_from_text(request: TextAnalysisRequest):
             request.text
         )
 
-        if ai_recs:
-            recommendations = ai_recs
+        if ai_recs and 'recommendations' in ai_recs:
+            # Dev branch format (list-based)
+            recommendations_result = ai_recs['recommendations']
+            rec_count = ai_recs.get('count', len(ai_recs['recommendations']))
+            source = "ai"
+        elif ai_recs:
+            # Our format (dict-based)
+            recommendations_result = ai_recs
             source = "ai"
         else:
-            # Fallback to rules (now includes multi-source)
-            recommendations = get_rule_recommendations(emotion_result['emotion'], request.text)
+            # Fallback to rules
+            rule_recs = get_rule_recommendations(emotion_result['emotion'], request.text)
+            if isinstance(rule_recs, list):
+                # Dev branch format
+                recommendations_result = rule_recs
+                rec_count = len(rule_recs)
+            else:
+                # Our format (multi-source dict)
+                recommendations_result = rule_recs
+                rec_count = 1
             source = "rules"
     else:
-        # Use rules only (includes multi-source)
-        recommendations = get_rule_recommendations(emotion_result['emotion'], request.text)
+        # Use rules only
+        rule_recs = get_rule_recommendations(emotion_result['emotion'], request.text)
+        if isinstance(rule_recs, list):
+            recommendations_result = rule_recs
+            rec_count = len(rule_recs)
+        else:
+            recommendations_result = rule_recs
+            rec_count = 1
 
     # Get multi-source recommendations
     multi_source_recs = get_multi_source_recommendations(
@@ -210,7 +232,8 @@ async def detect_from_text(request: TextAnalysisRequest):
         "confidence": emotion_result['confidence'],
         "emoji": emotion_result['emoji'],
         "color": emotion_result['color'],
-        "recommendations": recommendations,
+        "recommendations": recommendations_result,
+        "count": rec_count,
         "source": source,
         "scores": emotion_result.get('scores'),
         "method": method,
@@ -235,12 +258,6 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
 
     # 1. Transcribe speech to text
     try:
-        transcribed_text = transcribe_speech(
-            audio_data=None,  # Will use base64 internally
-            from_mic=False
-        )
-
-        # Use the base64 method directly
         from speech.stt import get_stt
         transcribed_text = get_stt().transcribe_from_base64(request.audio_base64)
 
@@ -272,8 +289,9 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         method = 'vader'
 
     # 3. Get recommendations (AI or Rules)
-    recommendations = {}
+    recommendations_result: Any = {}
     source = "rules"
+    rec_count = 0
 
     if request.use_ai:
         # Try AI first
@@ -282,16 +300,30 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
             transcribed_text
         )
 
-        if ai_recs:
-            recommendations = ai_recs
+        if ai_recs and 'recommendations' in ai_recs:
+            recommendations_result = ai_recs['recommendations']
+            rec_count = ai_recs.get('count', len(ai_recs['recommendations']))
+            source = "ai"
+        elif ai_recs:
+            recommendations_result = ai_recs
             source = "ai"
         else:
-            # Fallback to rules (now includes multi-source)
-            recommendations = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
+            rule_recs = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
+            if isinstance(rule_recs, list):
+                recommendations_result = rule_recs
+                rec_count = len(rule_recs)
+            else:
+                recommendations_result = rule_recs
+                rec_count = 1
             source = "rules"
     else:
-        # Use rules only (includes multi-source)
-        recommendations = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
+        rule_recs = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
+        if isinstance(rule_recs, list):
+            recommendations_result = rule_recs
+            rec_count = len(rule_recs)
+        else:
+            recommendations_result = rule_recs
+            rec_count = 1
 
     # Get multi-source recommendations
     multi_source_recs = get_multi_source_recommendations(
@@ -300,7 +332,7 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         source_types=['music', 'podcast', 'video', 'activity', 'self_care']
     )
 
-    # Get external resource recommendations (YouTube, Spotify, etc.)
+    # Get external resource recommendations
     external_recs = get_external_recommendations(
         emotion=emotion_result['emotion'],
         context=transcribed_text,
@@ -314,7 +346,8 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         "confidence": emotion_result['confidence'],
         "emoji": emotion_result['emoji'],
         "color": emotion_result['color'],
-        "recommendations": recommendations,
+        "recommendations": recommendations_result,
+        "count": rec_count,
         "source": source,
         "scores": emotion_result.get('scores'),
         "method": method,
@@ -328,14 +361,14 @@ if __name__ == "__main__":
     # Get configuration from environment
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8000))
-    
+
     print(f"""
     ╔══════════════════════════════════════════════════════════╗
     ║       🧠 Emotion-Aware Bot API Server                    ║
     ╠══════════════════════════════════════════════════════════╣
-    ║  Starting server on http://{host}:{port}                    ║
-    ║  API Docs: http://{host}:{port}/docs                        ║
+    ║  Starting server on http://{host}:{port}                 ║
+    ║  API Docs: http://{host}:{port}/docs                     ║
     ╚══════════════════════════════════════════════════════════╝
     """)
-    
+
     uvicorn.run(app, host=host, port=port)

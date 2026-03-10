@@ -80,11 +80,11 @@ def get_recommender() -> RuleBasedRecommender:
 def get_recommendations(emotion: str, context: str = "") -> Dict:
     """
     Convenience function to get recommendations
-    
+
     Args:
         emotion: Detected emotion
         context: Optional context
-        
+
     Returns:
         Recommendation dictionary
     """
@@ -94,7 +94,7 @@ def get_recommendations(emotion: str, context: str = "") -> Dict:
 if __name__ == "__main__":
     # Test the recommender
     recommender = RuleBasedRecommender()
-    
+
     for emotion in ['joy', 'anger', 'sadness', 'fear', 'neutral']:
         print(f"\n{emotion.upper()}:")
         rec = recommender.get_recommendations(emotion)
