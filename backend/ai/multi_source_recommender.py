@@ -7,6 +7,76 @@ from typing import Dict, List, Optional
 import random
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Myanmar Language Social Messages & Quick Actions
+# ─────────────────────────────────────────────────────────────────────────────
+
+MYANMAR_SOCIAL_MESSAGES: Dict[str, List[str]] = {
+    'joy': [
+        "ဒီ သတင်းကောင်းကို မိတ်ဆွေတစ်ဦးဦးနှင့် မျှဝေလိုက်ပါ 🌟",
+        "ဒီ ပျော်ရွှင်မှုကို မိသားစုနှင့် ဝေမျှပါ 💛",
+        "ကျေးဇူးတင်ကြောင်း တစ်ဦးဦးကို မက်ဆေ့ပို့လိုက်ပါ",
+        "ဒီနေ့ ကံကောင်းမှုကို မနက်ဖြန်မှတ်တမ်းတင်ထားပါ 📝",
+    ],
+    'anger': [
+        "အခုချိန် နည်းနည်းအနားယူပြီး နောက်မှ ပြန်ဆွေးနွေးပါ 🧘",
+        "ဒေါသ ဖြေနိုင်ဖို့ လမ်းလျှောက်ထွက်ပါ 🚶",
+        "မိတ်ဆွေကို 'ခဏနေပြီး ပြန်ဆွေးနွေးမယ်' လို့ ပြောပါ",
+        "ခံစားချက်တွေကို စာနဲ့ ရေးချပြီး ဖြစ်ဖြစ်ပျက်ပျက် လုပ်ပါ",
+    ],
+    'sadness': [
+        "'ဒီနေ့ ကျွန်တော်/ကျွန်မ ခက်ခဲနေတယ်၊ ဂရုစိုက်ပေးနိုင်မလား' ဆိုပြီး မိတ်ဆွေကို ဆက်သွယ်ပါ 💙",
+        "ကြည်ကြည်ဖြူဖြူ ငိုချင်ရင် ငိုပါ၊ အဆင်ပြေပါတယ် 🌧️",
+        "ချစ်ခင်ရသူတစ်ဦးကို ဖုန်းဆက်ပြောပါ",
+        "မိသားစုနှင့် ဆုံပြီး ဝေမျှပါ",
+    ],
+    'fear': [
+        "ကြောက်နေတာကို လူချစ်ရာတစ်ဦးကို ပွင့်ပွင့်လင်းလင်း ပြောပါ 🤝",
+        "'ကျွန်တော်/ကျွန်မ ပူပန်နေတယ်' ဆိုပြီး မိတ်ဆွေကို ပြောပါ",
+        "ယုံကြည်ရသူတစ်ဦးနှင့် တွေ့ဆုံပါ",
+        "အကူအညီတောင်းဖို့ မရှက်ပါနှင့် 💪",
+    ],
+    'neutral': [
+        "မိတ်ဆွေတစ်ဦးကို 'ဘယ်လိုနေသလဲ' ဆိုပြီး ဆက်သွယ်ပါ",
+        "ကောင်းကောင်းလေး မနက်ပြန်တွေ့ကြမယ် 😊",
+        "ဒီနေ့ တစ်ခုခုကောင်းကောင်း လုပ်ဆောင်ဖို့ plan ချပါ",
+    ],
+}
+
+MYANMAR_QUICK_ACTIONS: Dict[str, Dict] = {
+    'joy': {
+        'title': 'ဂျာနယ်ရေးပါ',
+        'description': 'ဒီနေ့ ပျော်ရွှင်မှုကို ဂျာနယ်တွင် မှတ်တမ်းတင်ပါ',
+        'duration': '5-10 မိနစ်',
+        'effort': 'နည်း',
+    },
+    'anger': {
+        'title': 'Box Breathing လေ့ကျင့်ပါ',
+        'description': '4 ချက် ရှူသွင်း၊ 4 ချက် ကိုင်ထား၊ 4 ချက် ရှူထုတ် — 3 ကြိမ် ပြုလုပ်ပါ',
+        'duration': '3-5 မိနစ်',
+        'effort': 'နည်း',
+    },
+    'sadness': {
+        'title': 'နွေးနွေးထွေးထွေး ဖျော်ရည်သောက်ပါ',
+        'description': 'လက်ဖက်ရည် သို့မဟုတ် ကော်ဖီ တစ်ခွက် ၊ ကိုယ်ကို ဂရုစိုက်ပါ',
+        'duration': '10-15 မိနစ်',
+        'effort': 'နည်း',
+    },
+    'fear': {
+        'title': '5-4-3-2-1 Grounding လုပ်ပါ',
+        'description': 'မြင်ရတဲ့ 5 ခု၊ ထိနိုင်တဲ့ 4 ခု၊ ကြားရတဲ့ 3 ခု၊ မှုတ်ရတဲ့ 2 ခု၊ အရသာ 1 ခု — ပြောပါ',
+        'duration': '3-5 မိနစ်',
+        'effort': 'နည်း',
+    },
+    'neutral': {
+        'title': 'လမ်းလျှောက်ထွက်ပါ',
+        'description': 'ပတ်ဝန်းကျင်ကို သတိပြုရင်း တိတ်ဆိတ်စွာ လမ်းလျှောက်ပါ',
+        'duration': '15-20 မိနစ်',
+        'effort': 'နည်း',
+    },
+}
+
+
 class MultiSourceRecommender:
     """Generate multi-source recommendations based on emotion"""
 
@@ -262,9 +332,9 @@ class MultiSourceRecommender:
         }
     }
 
-    def get_recommendations(self, emotion: str, context: str = "", 
+    def get_recommendations(self, emotion: str, context: str = "",
                            source_types: Optional[List[str]] = None,
-                           count: int = 3) -> Dict:
+                           count: int = 3, language: str = 'en') -> Dict:
         """
         Get multi-source recommendations based on emotion
 
@@ -304,9 +374,16 @@ class MultiSourceRecommender:
         if 'activity' in emotion_recs:
             recommendations['quick_action'] = random.choice(emotion_recs['activity'])
 
-        # Add send_message suggestion (for sharing)
-        if 'social' in emotion_recs:
-            recommendations['send_message'] = random.choice(emotion_recs['social'])
+        # Add send_message suggestion — Myanmar or English based on language
+        if language == 'my':
+            my_msgs = MYANMAR_SOCIAL_MESSAGES.get(emotion, MYANMAR_SOCIAL_MESSAGES['neutral'])
+            recommendations['send_message'] = random.choice(my_msgs)
+            recommendations['quick_action'] = MYANMAR_QUICK_ACTIONS.get(
+                emotion, MYANMAR_QUICK_ACTIONS['neutral']
+            )
+        else:
+            if 'social' in emotion_recs:
+                recommendations['send_message'] = random.choice(emotion_recs['social'])
 
         return recommendations
 
@@ -349,8 +426,9 @@ def get_recommender() -> MultiSourceRecommender:
     return _recommender
 
 
-def get_recommendations(emotion: str, context: str = "", 
-                       source_types: Optional[List[str]] = None) -> Dict:
+def get_recommendations(emotion: str, context: str = "",
+                       source_types: Optional[List[str]] = None,
+                       language: str = 'en') -> Dict:
     """
     Convenience function to get multi-source recommendations
 
@@ -358,11 +436,12 @@ def get_recommendations(emotion: str, context: str = "",
         emotion: Detected emotion
         context: Optional context
         source_types: Optional list of source types
+        language: 'en' for English, 'my' for Myanmar
 
     Returns:
         Multi-source recommendation dictionary
     """
-    return get_recommender().get_recommendations(emotion, context, source_types)
+    return get_recommender().get_recommendations(emotion, context, source_types, language=language)
 
 
 def get_quick_recommendation(emotion: str) -> Dict:

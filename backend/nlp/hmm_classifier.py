@@ -364,57 +364,52 @@ if __name__ == "__main__":
     print("Testing HMM Emotion Classifier")
     print("=" * 50)
     
-    # Sample training data (in practice, use much larger dataset)
+    # Expanded training data for better accuracy
     training_data = {
         'joy': [
-            "I am so happy today!",
-            "This is wonderful news!",
-            "I love this so much!",
-            "Feeling great and excited!",
-            "Best day ever, so joyful!",
-            "I'm thrilled and delighted!",
-            "What a happy moment!",
-            "Feeling amazing and cheerful!"
+            "I am so happy today!", "This is wonderful news!", "I love this so much!",
+            "Feeling great and excited!", "Best day ever, so joyful!", "I'm thrilled and delighted!",
+            "What a happy moment!", "Feeling amazing and cheerful!", "This is so fantastic!",
+            "I'm on cloud nine!", "Such a beautiful day!", "I'm so glad to hear that!",
+            "Success at last, so happy!", "Feeling blessed and grateful!", "This makes me smile!",
+            "I'm jumping for joy!", "Everything is perfect!", "So much fun today!",
+            "I feel so alive and happy!", "Pure bliss and happiness!"
         ],
         'anger': [
-            "This makes me so angry!",
-            "I'm furious about this!",
-            "That's really annoying!",
-            "I hate this situation!",
-            "So frustrated and mad!",
-            "This is outrageous!",
-            "I'm irritated and upset!",
-            "Absolutely infuriating!"
+            "This makes me so angry!", "I'm furious about this!", "That's really annoying!",
+            "I hate this situation!", "So frustrated and mad!", "This is outrageous!",
+            "I'm irritated and upset!", "Absolutely infuriating!", "I'm boiling with rage!",
+            "Stop bothering me, I'm mad!", "This is so unfair and wrong!", "I'm lose my temper!",
+            "Don't talk to me, I'm angry!", "This is getting on my nerves!", "I'm so pissed off!",
+            "Enough is enough!", "I can't stand this anymore!", "This is total nonsense!",
+            "I'm screaming with frustration!", "How dare you do that!"
         ],
         'sadness': [
-            "I feel really sad and lonely",
-            "This is so depressing",
-            "I'm feeling down today",
-            "Heartbroken and miserable",
-            "So sad and disappointed",
-            "Feeling blue and tearful",
-            "Everything feels hopeless",
-            "Crying and feeling low"
+            "I feel really sad and lonely", "This is so depressing", "I'm feeling down today",
+            "Heartbroken and miserable", "So sad and disappointed", "Feeling blue and tearful",
+            "Everything feels hopeless", "Crying and feeling low", "I'm so lonely and sad",
+            "This news is devastating", "I feel like crying all day", "Grief and sorrow everywhere",
+            "I'm feeling so empty inside", "It's a very sad day", "I miss them so much, it hurts",
+            "Feeling rejected and alone", "My heart is heavy with sadness", "So gloomy and unhappy",
+            "I can't stop the tears", "Deeply saddened by this"
         ],
         'fear': [
-            "I'm worried about the future",
-            "This is scary and frightening",
-            "I'm anxious and nervous",
-            "Feeling terrified and panicked",
-            "So afraid and worried",
-            "This makes me nervous",
-            "I'm scared of what might happen",
-            "Feeling anxious and fearful"
+            "I'm worried about the future", "This is scary and frightening", "I'm anxious and nervous",
+            "Feeling terrified and panicked", "So afraid and worried", "This makes me nervous",
+            "I'm scared of what might happen", "Feeling anxious and fearful", "I'm in total panic!",
+            "This is so spooky and creepy!", "I'm trembling with fear", "I feel a sense of dread",
+            "My heart is racing, I'm scared", "I'm terrified of this", "So nervous and shaky",
+            "Horrified by what I saw", "I'm so anxious I can't breathe", "Everything is so scary",
+            "I feel threatened and afraid", "I'm panicking right now!"
         ],
         'neutral': [
-            "The weather is okay",
-            "Just another regular day",
-            "Nothing special happening",
-            "Feeling normal today",
-            "It's an average day",
-            "Everything is fine",
-            "No strong feelings",
-            "Just feeling normal"
+            "The weather is okay", "Just another regular day", "Nothing special happening",
+            "Feeling normal today", "It's an average day", "Everything is fine",
+            "No strong feelings", "Just feeling normal", "I'm okay with this",
+            "It is what it is", "No particular emotion", "Just sitting here quietly",
+            "Taking it easy today", "The sky is blue", "I'm just browsing",
+            "Standard procedure followed", "Nothing out of the ordinary", "Balanced and calm",
+            "Simply existing", "A very plain day"
         ]
     }
     

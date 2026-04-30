@@ -1,10 +1,12 @@
 """
 NLTK-based Emotion Detection using VADER Sentiment Analysis
+MyanmarLanguage support added via myanmar_emotion_detector module.
 """
 
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from typing import Dict, Tuple
+from nlp.myanmar_emotion_detector import is_myanmar_text, detect_myanmar_emotion
 
 
 class EmotionDetector:
@@ -63,6 +65,7 @@ class EmotionDetector:
             'confidence': round(confidence, 2),
             'emoji': self.EMOTION_EMOJIS[emotion],
             'color': self.EMOTION_COLORS[emotion],
+            'language': 'en',
             'scores': {
                 'negative': round(scores['neg'], 3),
                 'neutral': round(scores['neu'], 3),
@@ -122,14 +125,18 @@ def get_detector() -> EmotionDetector:
 
 def detect_emotion(text: str) -> Dict:
     """
-    Convenience function to detect emotion
-    
+    Convenience function to detect emotion.
+    Myanmar text ဖြစ်ပါက myanmar_emotion_detector ကို route လုပ်သည်။
+    English text ဖြစ်ပါက VADER ကို သုံးသည်။
+
     Args:
-        text: Input text
-        
+        text: Input text (English or Myanmar)
+
     Returns:
         Emotion detection result dictionary
     """
+    if is_myanmar_text(text):
+        return detect_myanmar_emotion(text)
     return get_detector().detect(text)
 
 

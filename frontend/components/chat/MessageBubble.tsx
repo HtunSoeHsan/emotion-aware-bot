@@ -11,7 +11,9 @@ export interface Message {
   confidence?: number;
   emoji?: string;
   color?: string;
-  recommendations?: any; // Can be dict (multi-source) or list (dev branch)
+  method?: string;     // 'vader' | 'hmm' | 'hybrid' | 'myanmar_keyword'
+  language?: string;  // 'en' | 'my'
+  recommendations?: any;
   source?: 'ai' | 'rules';
   count?: number;
   multi_source?: any;
@@ -108,20 +110,45 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
             )}
 
             {message.emotion && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${gradientClass} text-white text-xs font-semibold shadow-md`}
-              >
-                <span>{message.emoji}</span>
-                <span className="capitalize">{message.emotion}</span>
-                {message.confidence && (
-                  <span className="opacity-90 text-[10px]">
-                    ({Math.round(message.confidence * 100)}% match)
-                  </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${gradientClass} text-white text-xs font-semibold shadow-md`}
+                >
+                  <span>{message.emoji}</span>
+                  <span className="capitalize">{message.emotion}</span>
+                  {message.confidence && (
+                    <span className="opacity-90 text-[10px]">
+                      ({Math.round(message.confidence * 100)}%)
+                    </span>
+                  )}
+                </motion.div>
+
+                {/* Method badge */}
+                {message.method && (
+                  <motion.span
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.35 }}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                      message.method === 'hmm'
+                        ? 'bg-purple-50 border-purple-200 text-purple-700'
+                        : message.method === 'hybrid'
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        : message.method === 'myanmar_keyword'
+                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                        : 'bg-blue-50 border-blue-200 text-blue-700'
+                    }`}
+                  >
+                    {message.method === 'vader' && '🔵 VADER'}
+                    {message.method === 'hmm' && '🟣 HMM'}
+                    {message.method === 'hybrid' && '🔷 Hybrid'}
+                    {message.method === 'myanmar_keyword' && '🇲🇲 Myanmar'}
+                  </motion.span>
                 )}
-              </motion.div>
+              </div>
             )}
           </div>
         </div>

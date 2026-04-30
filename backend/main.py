@@ -18,6 +18,7 @@ from ai.groq_agent import get_ai_recommendations, get_agent
 from ai.fallback_rules import get_recommendations as get_rule_recommendations
 from ai.multi_source_recommender import get_recommendations as get_multi_source_recommendations
 from ai.external_resource_recommender import get_external_recommendations
+from nlp.myanmar_emotion_detector import is_myanmar_text
 from speech.stt import transcribe_speech
 
 # Load environment variables
@@ -64,6 +65,7 @@ class AnalysisResponse(BaseModel):
     count: Optional[int] = None  # Number of recommendations (dev branch)
     scores: Optional[Dict[str, float]] = None
     method: Optional[str] = "vader"
+    language: Optional[str] = "en"  # "en" for English, "my" for Myanmar
     multi_source: Optional[Dict[str, Any]] = None  # Multi-source recommendations
     external_resources: Optional[Dict[str, Any]] = None  # External API recommendations
 
@@ -127,9 +129,16 @@ async def detect_from_text(request: TextAnalysisRequest):
 
     # 1. Detect emotion using specified method
     method = request.method.lower()
+
+    # PRIORITIZE MYANMAR LANGUAGE
+    from nlp.myanmar_emotion_detector import is_myanmar_text
     
-    if method == "hmm":
-        # Use HMM classifier
+    if is_myanmar_text(request.text):
+        emotion_result = detect_emotion(request.text)
+        emotion_result['method'] = 'myanmar_keyword'
+        method = 'myanmar_keyword'
+    elif method == "hmm":
+        # Use HMM classifier for English
         try:
             hmm_classifier = get_hmm_classifier()
             if not hmm_classifier.is_trained:
@@ -139,12 +148,13 @@ async def detect_from_text(request: TextAnalysisRequest):
                 method = 'vader'
             else:
                 emotion_result = hmm_classifier.detect(request.text)
+                emotion_result['method'] = 'hmm'
         except Exception:
             emotion_result = detect_emotion(request.text)
             emotion_result['method'] = 'vader'
             method = 'vader'
     elif method == "hybrid":
-        # Use both VADER and HMM, combine results
+        # Use both VADER and HMM for English, combine results
         vader_result = detect_emotion(request.text)
         try:
             hmm_classifier = get_hmm_classifier()
@@ -163,7 +173,7 @@ async def detect_from_text(request: TextAnalysisRequest):
         emotion_result['method'] = 'hybrid'
         method = 'hybrid'
     else:
-        # Default to VADER
+        # Default to VADER for English
         emotion_result = detect_emotion(request.text)
         emotion_result['method'] = 'vader'
         method = 'vader'
@@ -211,11 +221,15 @@ async def detect_from_text(request: TextAnalysisRequest):
             recommendations_result = rule_recs
             rec_count = 1
 
+    # Detect language from emotion result
+    detected_language = emotion_result.get('language', 'en')
+
     # Get multi-source recommendations
     multi_source_recs = get_multi_source_recommendations(
         emotion=emotion_result['emotion'],
         context=request.text,
-        source_types=['music', 'podcast', 'video', 'activity', 'self_care']
+        source_types=['music', 'podcast', 'video', 'activity', 'self_care'],
+        language=detected_language
     )
 
     # Get external resource recommendations (YouTube, Spotify, etc.)
@@ -237,6 +251,7 @@ async def detect_from_text(request: TextAnalysisRequest):
         "source": source,
         "scores": emotion_result.get('scores'),
         "method": method,
+        "language": detected_language,
         "multi_source": multi_source_recs,
         "external_resources": external_recs
     }
@@ -270,7 +285,13 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
     # 2. Detect emotion using specified method
     method = request.method.lower() if hasattr(request, 'method') else "vader"
     
-    if method == "hmm":
+    # PRIORITIZE MYANMAR LANGUAGE
+    from nlp.myanmar_emotion_detector import is_myanmar_text
+    if is_myanmar_text(transcribed_text):
+        emotion_result = detect_emotion(transcribed_text)
+        emotion_result['method'] = 'myanmar_keyword'
+        method = 'myanmar_keyword'
+    elif method == "hmm":
         try:
             hmm_classifier = get_hmm_classifier()
             if not hmm_classifier.is_trained:
@@ -279,11 +300,31 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
                 method = 'vader'
             else:
                 emotion_result = hmm_classifier.detect(transcribed_text)
+                emotion_result['method'] = 'hmm'
         except Exception:
             emotion_result = detect_emotion(transcribed_text)
             emotion_result['method'] = 'vader'
             method = 'vader'
+    elif method == "hybrid":
+        # Use both VADER and HMM for English
+        vader_result = detect_emotion(transcribed_text)
+        try:
+            hmm_classifier = get_hmm_classifier()
+            if hmm_classifier.is_trained:
+                hmm_result = hmm_classifier.detect(transcribed_text)
+                # If both agree, increase confidence
+                if vader_result['emotion'] == hmm_result['emotion']:
+                    vader_result['confidence'] = min(1.0, vader_result['confidence'] + 0.1)
+                else:
+                    vader_result['hmm_emotion'] = hmm_result['emotion']
+                    vader_result['hmm_confidence'] = hmm_result['confidence']
+        except Exception:
+            pass
+        emotion_result = vader_result
+        emotion_result['method'] = 'hybrid'
+        method = 'hybrid'
     else:
+        # Default to VADER for English
         emotion_result = detect_emotion(transcribed_text)
         emotion_result['method'] = 'vader'
         method = 'vader'
@@ -325,11 +366,15 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
             recommendations_result = rule_recs
             rec_count = 1
 
+    # Detect language from emotion result
+    detected_language = emotion_result.get('language', 'en')
+
     # Get multi-source recommendations
     multi_source_recs = get_multi_source_recommendations(
         emotion=emotion_result['emotion'],
         context=transcribed_text,
-        source_types=['music', 'podcast', 'video', 'activity', 'self_care']
+        source_types=['music', 'podcast', 'video', 'activity', 'self_care'],
+        language=detected_language
     )
 
     # Get external resource recommendations
@@ -351,6 +396,7 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         "source": source,
         "scores": emotion_result.get('scores'),
         "method": method,
+        "language": detected_language,
         "multi_source": multi_source_recs,
         "external_resources": external_recs
     }

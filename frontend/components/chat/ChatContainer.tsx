@@ -19,7 +19,8 @@ import {
   Frown,
   Meh,
   Heart,
-  ThumbsUp
+  ThumbsUp,
+  Languages,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,10 @@ export default function ChatContainer() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  // Language toggle: 'en' = English, 'my' = Myanmar
+  const [inputLanguage, setInputLanguage] = useState<'en' | 'my'>('en');
+  // Detection method: 'vader', 'hmm', or 'hybrid'
+  const [detectionMethod, setDetectionMethod] = useState<'vader' | 'hmm' | 'hybrid'>('vader');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -77,7 +82,7 @@ export default function ChatContainer() {
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
-      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.lang = inputLanguage === 'my' ? 'my-MM' : 'en-US';
       recognitionRef.current.interimResults = false;
 
       recognitionRef.current.onstart = () => setIsListening(true);
@@ -169,8 +174,12 @@ export default function ChatContainer() {
     setIsLoading(true);
 
     try {
-      // Call API
-      const result = await analyzeText(messageText, useAI);
+      // Call API with selected method
+      const result = await analyzeText(
+        messageText, 
+        useAI, 
+        inputLanguage === 'my' ? 'vader' : detectionMethod
+      );
 
       // Debug: Log the full API response
       console.log('=== API Response ===');
@@ -186,6 +195,8 @@ export default function ChatContainer() {
         confidence: result.confidence,
         emoji: result.emoji,
         color: result.color,
+        method: result.method,
+        language: result.language,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMessage]);
@@ -224,10 +235,22 @@ export default function ChatContainer() {
   };
 
   const toggleListening = () => {
+    if (recognitionRef.current) {
+      // Update language before starting
+      recognitionRef.current.lang = inputLanguage === 'my' ? 'my-MM' : 'en-US';
+    }
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
       recognitionRef.current?.start();
+    }
+  };
+
+  // Toggle between English and Myanmar input language
+  const toggleLanguage = () => {
+    setInputLanguage((prev) => (prev === 'en' ? 'my' : 'en'));
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = inputLanguage === 'en' ? 'my-MM' : 'en-US';
     }
   };
 
@@ -337,25 +360,62 @@ export default function ChatContainer() {
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setUseAI(!useAI)}
-            className="border-slate-300 hover:bg-slate-50"
-            disabled={!aiAvailable}
-          >
-            {useAI ? (
-              <>
-                <Sparkles className="w-4 h-4 mr-2 text-indigo-600" />
-                AI Mode
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4 mr-2 text-amber-600" />
-                Fast Mode
-              </>
+          <div className="flex items-center gap-2">
+            {/* Method Switcher - Only for English */}
+            {inputLanguage === 'en' && (
+              <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
+                {(['vader', 'hmm', 'hybrid'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setDetectionMethod(m)}
+                    className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                      detectionMethod === m
+                        ? 'bg-white text-indigo-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {m.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             )}
-          </Button>
+
+            {/* Language Toggle Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleLanguage}
+              title={inputLanguage === 'en' ? 'Switch to Myanmar' : 'Switch to English'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                inputLanguage === 'my'
+                  ? 'bg-amber-50 border-amber-300 text-amber-700'
+                  : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Languages className="w-4 h-4" />
+              <span>{inputLanguage === 'my' ? '🇲🇲 မြန်မာ' : '🇺🇸 English'}</span>
+            </motion.button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUseAI(!useAI)}
+              className="border-slate-300 hover:bg-slate-50"
+              disabled={!aiAvailable}
+            >
+              {useAI ? (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2 text-indigo-600" />
+                  AI Mode
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2 text-amber-600" />
+                  Fast Mode
+                </>
+              )}
+            </Button>
+          </div>
         </header>
 
         {/* Messages Area */}
@@ -379,36 +439,68 @@ export default function ChatContainer() {
                   Try sharing how you're feeling!
                 </p>
 
-                {/* Example Prompts Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    { emoji: '😊', text: "I just got amazing news!", emotion: 'Share joy' },
-                    { emoji: '😠', text: "This is so frustrating!", emotion: 'Express anger' },
-                    { emoji: '😢', text: "I'm feeling down today", emotion: 'Need support' },
-                    { emoji: '😨', text: "I'm worried about something", emotion: 'Share fear' },
-                  ].map((example, index) => (
-                    <motion.button
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{ scale: 1.02, y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleSend(example.text)}
-                      className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md transition-all duration-200 group"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">{example.emoji}</span>
-                        <div>
-                          <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600">
-                            {example.text}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
+                {/* Example Prompts Grid — language-aware */}
+                {inputLanguage === 'my' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { emoji: '😊', text: 'ဒီနေ့ တော်တော် ပျော်တယ်!', emotion: 'ပျော်ရွှင်မှု' },
+                      { emoji: '😠', text: 'ဒေါသ တော်တော် ဖြစ်နေတယ်', emotion: 'ဒေါသ' },
+                      { emoji: '😢', text: 'ဝမ်းနည်းနေတယ်...', emotion: 'ဝမ်းနည်းမှု' },
+                      { emoji: '😨', text: 'ကြောက်နေမိတယ်', emotion: 'ကြောက်ရွံ့မှု' },
+                    ].map((example, index) => (
+                      <motion.button
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleSend(example.text)}
+                        className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left hover:border-amber-400 hover:bg-amber-100 hover:shadow-md transition-all duration-200 group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">{example.emoji}</span>
+                          <div>
+                            <p className="text-sm font-medium text-slate-700 group-hover:text-amber-700">
+                              {example.text}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
+                          </div>
                         </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { emoji: '😊', text: "I just got amazing news!", emotion: 'Share joy' },
+                      { emoji: '😠', text: "This is so frustrating!", emotion: 'Express anger' },
+                      { emoji: '😢', text: "I'm feeling down today", emotion: 'Need support' },
+                      { emoji: '😨', text: "I'm worried about something", emotion: 'Share fear' },
+                    ].map((example, index) => (
+                      <motion.button
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleSend(example.text)}
+                        className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md transition-all duration-200 group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">{example.emoji}</span>
+                          <div>
+                            <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600">
+                              {example.text}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             </div>
           ) : (
@@ -502,7 +594,11 @@ export default function ChatContainer() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Share how you're feeling..."
+                placeholder={
+                  inputLanguage === 'my'
+                    ? 'ခံစားချက်တွေ ပြောပြပါ... (မြန်မာဘာသာ)'
+                    : "Share how you're feeling..."
+                }
                 disabled={isLoading || isListening}
                 rows={1}
                 className="flex-1 bg-transparent border-0 focus:ring-0 resize-none py-3 px-2 text-slate-800 placeholder:text-slate-400 max-h-[200px]"
@@ -546,7 +642,9 @@ export default function ChatContainer() {
             )}
 
             <p className="text-xs text-center text-slate-500 mt-3">
-              Emotion-Aware AI can make mistakes. Consider checking important information.
+              {inputLanguage === 'my'
+                ? 'မြန်မာဘာသာ ✦ English — ကြွေးကြော်ဖော်ပြချက်များ မှားနိုင်ပါသည်'
+                : 'Emotion-Aware AI can make mistakes. Consider checking important information.'}
             </p>
           </div>
         </div>

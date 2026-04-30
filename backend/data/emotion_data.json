@@ -1,0 +1,62 @@
+{
+    "joy": [
+        "I am so happy today!",
+        "This is wonderful news!",
+        "I love this so much!",
+        "Feeling great and excited!",
+        "Best day ever, so joyful!",
+        "I'm thrilled and delighted!",
+        "Success at last!",
+        "This makes me smile",
+        "I am on cloud nine",
+        "Everything is perfect"
+    ],
+    "anger": [
+        "This makes me so angry!",
+        "I'm furious about this!",
+        "That's really annoying!",
+        "I hate this situation!",
+        "So frustrated and mad!",
+        "Don't talk to me!",
+        "I'm so pissed off",
+        "Stop bothering me",
+        "This is outrageous",
+        "I'm lose my temper"
+    ],
+    "sadness": [
+        "I feel really sad and lonely",
+        "This is so depressing",
+        "I'm feeling down today",
+        "Heartbroken and miserable",
+        "So sad and disappointed",
+        "I want to cry",
+        "Everything is so sad",
+        "I feel lonely",
+        "Deeply saddened",
+        "Feeling blue"
+    ],
+    "fear": [
+        "I'm worried about the future",
+        "This is scary and frightening",
+        "I'm anxious and nervous",
+        "Feeling terrified and panicked",
+        "So afraid and worried",
+        "I'm scared",
+        "This is terrifying",
+        "I feel so anxious",
+        "I'm trembling with fear",
+        "Dreadful feeling"
+    ],
+    "neutral": [
+        "The weather is okay",
+        "Just another regular day",
+        "Nothing special happening",
+        "Feeling normal today",
+        "It's an average day",
+        "Everything is fine",
+        "I'm okay",
+        "Normal day",
+        "Balanced and calm",
+        "It is what it is"
+    ]
+}
