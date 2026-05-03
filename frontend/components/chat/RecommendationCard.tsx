@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Send, Footprints, Sparkles, Check, Copy, ExternalLink, Youtube, Music, Podcast, Newspaper, GraduationCap } from 'lucide-react';
+import { Send, Footprints, Sparkles, Check, Copy, ExternalLink, Youtube, Music, Podcast, Newspaper, GraduationCap, Heart, Brain, Lightbulb, MessageCircle } from 'lucide-react';
 
 interface RecommendationCardProps {
   emotion: string;
@@ -79,13 +79,13 @@ export default function RecommendationCard({
   // Get embed URL for Spotify
   const getSpotifyEmbed = (url: string) => {
     return url.replace('open.spotify.com/playlist', 'open.spotify.com/embed/playlist')
-              .replace('open.spotify.com/track', 'open.spotify.com/embed/track');
+      .replace('open.spotify.com/track', 'open.spotify.com/embed/track');
   };
 
   // Combine all sources
-  const allSources = { 
-    ...multi_source?.sources, 
-    ...external_resources?.sources 
+  const allSources = {
+    ...multi_source?.sources,
+    ...external_resources?.sources
   };
 
   console.log('Combined allSources:', allSources);
@@ -110,40 +110,79 @@ export default function RecommendationCard({
         </CardHeader>
 
         <CardContent className="pt-4 space-y-6">
-          {/* Primary Recommendations */}
+          {/* AI or Primary Recommendations */}
           <div className="grid md:grid-cols-2 gap-4">
-            {recommendations?.send_message && (
-              <div className="bg-white/90 rounded-xl p-4 border">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                    <Send className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-slate-700 mb-2 uppercase">Send to someone</p>
-                    <p className="text-sm text-slate-800 italic mb-3">"{recommendations.send_message}"</p>
-                    <Button variant="outline" size="sm" onClick={() => handleCopy(0, 0)} className="h-9 text-xs">
-                      <Copy className="w-3.5 h-3.5 mr-1.5" />Copy
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Handle AI Recommendations (Array format) */}
+            {Array.isArray(recommendations) ? (
+              recommendations.map((item: any, idx: number) => {
+                let Icon = Sparkles;
+                let bgColor = 'bg-slate-100';
+                let iconColor = 'text-slate-600';
 
-            {recommendations?.action && (
-              <div className="bg-white/90 rounded-xl p-4 border">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                    <Footprints className="w-5 h-5 text-emerald-600" />
+                if (item.type === 'message') { Icon = Send; bgColor = 'bg-indigo-100'; iconColor = 'text-indigo-600'; }
+                if (item.type === 'action') { Icon = Footprints; bgColor = 'bg-emerald-100'; iconColor = 'text-emerald-600'; }
+                if (item.type === 'impact') { Icon = Brain; bgColor = 'bg-purple-100'; iconColor = 'text-purple-600'; }
+                if (item.type === 'reply_suggestion') { Icon = MessageCircle; bgColor = 'bg-blue-100'; iconColor = 'text-blue-600'; }
+
+                return (
+                  <div key={idx} className="bg-white/90 rounded-xl p-4 border hover:shadow-md transition-all">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-lg ${bgColor} flex items-center justify-center shrink-0`}>
+                        <Icon className={`w-5 h-5 ${iconColor}`} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{item.label}</p>
+                        <p className="text-sm text-slate-800 font-medium mb-3">{item.text}</p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleCopy(item.text, idx)} className="h-8 text-[10px]">
+                            {copiedId === idx ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                            {copiedId === idx ? 'Copied' : 'Copy'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-slate-700 mb-2 uppercase">Self-care action</p>
-                    <p className="text-sm text-slate-800 mb-3">{recommendations.action}</p>
-                    <Button variant="outline" size="sm" onClick={() => handleCopy(1, 1)} className="h-9 text-xs">
-                      <Copy className="w-3.5 h-3.5 mr-1.5" />Copy
-                    </Button>
+                );
+              })
+            ) : (
+              /* Handle Rule-based Recommendations (Object format) */
+              <>
+                {recommendations?.send_message && (
+                  <div className="bg-white/90 rounded-xl p-4 border">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                        <Send className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-slate-700 mb-2 uppercase">Send to someone</p>
+                        <p className="text-sm text-slate-800 italic mb-3">"{recommendations.send_message}"</p>
+                        <Button variant="outline" size="sm" onClick={() => handleCopy(recommendations.send_message, 0)} className="h-9 text-xs">
+                          {copiedId === 0 ? <Check className="w-3.5 h-3.5 mr-1.5" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
+
+                {recommendations?.action && (
+                  <div className="bg-white/90 rounded-xl p-4 border">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                        <Footprints className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-slate-700 mb-2 uppercase">Self-care action</p>
+                        <p className="text-sm text-slate-800 mb-3">{recommendations.action}</p>
+                        <Button variant="outline" size="sm" onClick={() => handleCopy(recommendations.action, 1)} className="h-9 text-xs">
+                          {copiedId === 1 ? <Check className="w-3.5 h-3.5 mr-1.5" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -176,17 +215,17 @@ export default function RecommendationCard({
                       <div key={idx} className="space-y-2">
                         {embedUrl ? (
                           <div className="aspect-video rounded-lg overflow-hidden bg-slate-900">
-                            <iframe 
-                              src={embedUrl} 
-                              title={item.title} 
-                              className="w-full h-full" 
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                              allowFullScreen 
+                            <iframe
+                              src={embedUrl}
+                              title={item.title}
+                              className="w-full h-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
                             />
                           </div>
                         ) : (
-                          <div 
-                            className="aspect-video rounded-lg bg-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-200" 
+                          <div
+                            className="aspect-video rounded-lg bg-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-200"
                             onClick={() => openLink(item.url)}
                           >
                             <Youtube className={`w-12 h-12 ${colors.text}`} />
@@ -221,12 +260,12 @@ export default function RecommendationCard({
                     return (
                       <div key={idx} className="border border-slate-200 rounded-lg p-4">
                         {item.url.includes('spotify.com') ? (
-                          <iframe 
-                            src={embedUrl} 
-                            title={item.title} 
-                            className="w-full rounded-lg" 
-                            style={{ height: '152px' }} 
-                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                          <iframe
+                            src={embedUrl}
+                            title={item.title}
+                            className="w-full rounded-lg"
+                            style={{ height: '152px' }}
+                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                           />
                         ) : (
                           <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100" onClick={() => openLink(item.url)}>
@@ -288,7 +327,7 @@ export default function RecommendationCard({
                 <div className="p-4 grid md:grid-cols-2 gap-4">
                   {allSources.ted.map((item: any, idx: number) => (
                     <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all">
-                      <div 
+                      <div
                         className="aspect-video bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center cursor-pointer"
                         onClick={() => openLink(item.url)}
                       >
@@ -307,6 +346,88 @@ export default function RecommendationCard({
                           </Button>
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Activities & Self-care */}
+            {(allSources.activity || allSources.self_care) && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {allSources.activity && allSources.activity.length > 0 && (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    <div className="bg-slate-50 px-4 py-3 flex items-center gap-3">
+                      <div className={`p-2 rounded-lg bg-orange-100`}>
+                        <Lightbulb className={`w-5 h-5 text-orange-600`} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800">Suggested Activities</p>
+                        <p className="text-xs text-slate-500">{allSources.activity.length} ideas</p>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {allSources.activity.map((item: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <p className="text-sm font-bold text-slate-800 mb-1">{item.title}</p>
+                          <p className="text-xs text-slate-600 mb-2">{item.description}</p>
+                          <div className="flex gap-2">
+                            {item.duration && <Badge variant="outline" className="text-[10px]">{item.duration}</Badge>}
+                            {item.effort && <Badge variant="outline" className="text-[10px] capitalize">Effort: {item.effort}</Badge>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {allSources.self_care && allSources.self_care.length > 0 && (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    <div className="bg-slate-50 px-4 py-3 flex items-center gap-3">
+                      <div className={`p-2 rounded-lg bg-pink-100`}>
+                        <Heart className={`w-5 h-5 text-pink-600`} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800">Self-Care Tips</p>
+                        <p className="text-xs text-slate-500">{allSources.self_care.length} tips</p>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-2">
+                      {allSources.self_care.map((tip: string, idx: number) => (
+                        <div key={idx} className="flex items-start gap-2 p-2 bg-pink-50/30 rounded-lg">
+                          <Check className="w-4 h-4 text-pink-500 mt-0.5 shrink-0" />
+                          <p className="text-sm text-slate-700">{tip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Social & Relationship Messages */}
+            {allSources.social && allSources.social.length > 0 && (
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <div className="bg-slate-50 px-4 py-3 flex items-center gap-3">
+                  <div className={`p-2 rounded-lg bg-blue-100`}>
+                    <MessageCircle className={`w-5 h-5 text-blue-600`} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800">Social & Relationship Replies</p>
+                    <p className="text-xs text-slate-500">{allSources.social.length} suggested messages</p>
+                  </div>
+                </div>
+                <div className="p-4 grid md:grid-cols-2 gap-3">
+                  {allSources.social.map((msg: string, idx: number) => (
+                    <div key={idx} className="p-3 bg-blue-50/50 rounded-lg border border-blue-100 group relative">
+                      <p className="text-sm text-slate-800 italic pr-8">"{msg}"</p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleCopy(msg, 1000 + idx)}
+                      >
+                        {copiedId === 1000 + idx ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      </Button>
                     </div>
                   ))}
                 </div>

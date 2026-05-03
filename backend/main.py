@@ -18,7 +18,8 @@ from ai.groq_agent import get_ai_recommendations, get_agent
 from ai.fallback_rules import get_recommendations as get_rule_recommendations
 from ai.multi_source_recommender import get_recommendations as get_multi_source_recommendations
 from ai.external_resource_recommender import get_external_recommendations
-from nlp.myanmar_emotion_detector import is_myanmar_text
+from nlp.myanmar_emotion_detector import is_myanmar_text, EMOTION_EMOJIS, EMOTION_COLORS
+from ai.face_emotion_detector import analyze_face_emotion
 from speech.stt import transcribe_speech
 
 # Load environment variables
@@ -44,8 +45,12 @@ app.add_middleware(
 # Request/Response Models
 class TextAnalysisRequest(BaseModel):
     text: str
-    use_ai: Optional[bool] = True
-    method: Optional[str] = "vader"  # "vader", "hmm", or "hybrid"
+    use_ai: bool = False
+    method: str = "vader"  # "vader", "hmm", "hybrid"
+
+class ImageAnalysisRequest(BaseModel):
+    image: str  # Base64 encoded image
+    language: str = "en"
 
 
 class VoiceAnalysisRequest(BaseModel):
@@ -334,37 +339,34 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
     source = "rules"
     rec_count = 0
 
+    # Detect language from emotion result
+    detected_language = emotion_result.get('language', 'en')
+
     if request.use_ai:
         # Try AI first
         ai_recs = get_ai_recommendations(
             emotion_result['emotion'],
-            transcribed_text
+            transcribed_text,
+            language=detected_language
         )
 
         if ai_recs and 'recommendations' in ai_recs:
             recommendations_result = ai_recs['recommendations']
-            rec_count = ai_recs.get('count', len(ai_recs['recommendations']))
+            rec_count = len(recommendations_result)
             source = "ai"
         elif ai_recs:
             recommendations_result = ai_recs
             source = "ai"
         else:
             rule_recs = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
-            if isinstance(rule_recs, list):
-                recommendations_result = rule_recs
-                rec_count = len(rule_recs)
-            else:
-                recommendations_result = rule_recs
-                rec_count = 1
+            recommendations_result = rule_recs if isinstance(rule_recs, list) else [rule_recs]
+            rec_count = len(recommendations_result)
             source = "rules"
     else:
         rule_recs = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
-        if isinstance(rule_recs, list):
-            recommendations_result = rule_recs
-            rec_count = len(rule_recs)
-        else:
-            recommendations_result = rule_recs
-            rec_count = 1
+        recommendations_result = rule_recs if isinstance(rule_recs, list) else [rule_recs]
+        rec_count = len(recommendations_result)
+        source = "rules"
 
     # Detect language from emotion result
     detected_language = emotion_result.get('language', 'en')
@@ -373,7 +375,7 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
     multi_source_recs = get_multi_source_recommendations(
         emotion=emotion_result['emotion'],
         context=transcribed_text,
-        source_types=['music', 'podcast', 'video', 'activity', 'self_care'],
+        source_types=['music', 'podcast', 'video', 'activity', 'social', 'self_care'],
         language=detected_language
     )
 
@@ -403,6 +405,100 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
 
 
 # Run server
+@app.post("/api/detect/image", response_model=AnalysisResponse)
+async def detect_from_image(request: ImageAnalysisRequest):
+    """
+    Detect emotion from a captured face image
+    """
+    # 1. Analyze face emotion
+    result = analyze_face_emotion(request.image)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    emotion = result["emotion"]
+    confidence = result["confidence"]
+    
+    # 2. Get recommendations based on detected emotion and language
+    multi_source_recs = get_multi_source_recommendations(
+        emotion=emotion,
+        source_types=['music', 'podcast', 'video', 'activity', 'self_care'],
+        language=request.language
+    )
+    
+    # Get external resource recommendations
+    external_recs = get_external_recommendations(
+        emotion=emotion,
+        sources=['youtube', 'spotify', 'podcast', 'ted']
+    )
+    
+    # 3. Hybrid Approach: Add AI-generated recommendations (Method 3)
+    from nlp.myanmar_emotion_detector import EMOTION_EMOJIS, EMOTION_COLORS
+    
+    # Generate natural text response
+    if request.language == 'my':
+        my_emotions = {
+            'joy': 'ပျော်ရွှင်',
+            'sadness': 'ဝမ်းနည်း',
+            'anger': 'ဒေါသထွက်',
+            'fear': 'ကြောက်ရွံ့',
+            'neutral': 'ပုံမှန်'
+        }
+        emo_name = my_emotions.get(emotion, 'ပုံမှန်')
+        display_text = f"သင့်မျက်နှာအမူအရာအရ {emo_name}နေတဲ့ ခံစားချက်ကို တွေ့ရှိရပါတယ်ဗျ။"
+    else:
+        display_text = f"I detected {emotion} in your facial expression."
+
+    from ai.groq_agent import get_ai_recommendations
+    ai_recs = get_ai_recommendations(
+        emotion=emotion,
+        context=display_text,
+        language=request.language
+    )
+    
+    recommendations_result = []
+    source = "rules"
+    if ai_recs and 'recommendations' in ai_recs:
+        recommendations_result = ai_recs['recommendations']
+        source = "ai"
+
+    return {
+        "text": display_text,
+        "emotion": emotion,
+        "confidence": confidence,
+        "emoji": EMOTION_EMOJIS.get(emotion, "😐"),
+        "color": EMOTION_COLORS.get(emotion, "gray"),
+        "recommendations": recommendations_result, # AI recommendations
+        "multi_source": multi_source_recs, # Manual Core
+        "external_resources": external_recs, # External
+        "source": source,
+        "method": "facial_recognition",
+        "language": request.language
+    }
+
+class SocialAnalysisRequest(BaseModel):
+    message: str
+    perspective: str = "receiver"  # "receiver" or "sender"
+    language: str = "en"
+
+@app.post("/api/social/analyze")
+async def analyze_social_message(request: SocialAnalysisRequest):
+    """
+    Analyze a social message (relationship advice)
+    """
+    from ai.groq_agent import get_social_advice
+    
+    advice = get_social_advice(
+        request.message, 
+        request.perspective, 
+        request.language
+    )
+    
+    if not advice:
+        raise HTTPException(status_code=500, detail="Failed to get social advice")
+        
+    return advice
+
 if __name__ == "__main__":
     # Get configuration from environment
     host = os.getenv("HOST", "0.0.0.0")

@@ -21,12 +21,15 @@ import {
   Heart,
   ThumbsUp,
   Languages,
+  Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble, { Message } from './MessageBubble';
 import RecommendationCard from './RecommendationCard';
-import { analyzeText, checkHealth } from '@/lib/api';
+import FaceCapture from './FaceCapture';
+import SocialAssistant from './SocialAssistant';
+import { analyzeText, checkHealth, analyzeImage, analyzeSocialMessage } from '@/lib/api';
 
 // Chat history item
 interface ChatSession {
@@ -50,6 +53,8 @@ export default function ChatContainer() {
   const [inputLanguage, setInputLanguage] = useState<'en' | 'my'>('en');
   // Detection method: 'vader', 'hmm', or 'hybrid'
   const [detectionMethod, setDetectionMethod] = useState<'vader' | 'hmm' | 'hybrid'>('vader');
+  const [showCamera, setShowCamera] = useState(false);
+  const [activeMode, setActiveMode] = useState<'chat' | 'social'>('chat');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -144,15 +149,15 @@ export default function ChatContainer() {
   // Save current chat to history
   const saveChat = () => {
     if (!currentChatId) return;
-    
+
     setChatHistory((prev) =>
       prev.map((chat) =>
         chat.id === currentChatId
           ? {
-              ...chat,
-              messages,
-              title: messages[0]?.text?.slice(0, 30) + '...' || 'New Conversation',
-            }
+            ...chat,
+            messages,
+            title: messages[0]?.text?.slice(0, 30) + '...' || 'New Conversation',
+          }
           : chat
       )
     );
@@ -176,8 +181,8 @@ export default function ChatContainer() {
     try {
       // Call API with selected method
       const result = await analyzeText(
-        messageText, 
-        useAI, 
+        messageText,
+        useAI,
         inputLanguage === 'my' ? 'vader' : detectionMethod
       );
 
@@ -234,6 +239,68 @@ export default function ChatContainer() {
     }
   };
 
+  // Handle facial emotion detection
+  const handleCapture = async (imageBase64: string) => {
+    setShowCamera(false);
+    setIsLoading(true);
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: inputLanguage === 'my' ? "[ဓာတ်ပုံမှ တစ်ဆင့် ခံစားချက်ကို စစ်ဆေးနေသည်...]" : "[Analyzing emotion from photo...]",
+      type: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    try {
+      const result = await analyzeImage(imageBase64, inputLanguage);
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: result.text,
+        type: 'bot',
+        timestamp: new Date(),
+        emotion: result.emotion,
+        confidence: result.confidence,
+        emoji: result.emoji,
+        color: result.color,
+        method: result.method,
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+
+      // Add recommendation card
+      if (result.recommendations) {
+        const recMessage: Message = {
+          id: (Date.now() + 2).toString(),
+          type: 'recommendation',
+          emotion: result.emotion,
+          color: result.color,
+          recommendations: result.recommendations,
+          source: result.source,
+          multi_source: result.multi_source,
+          external_resources: result.external_resources,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, recMessage]);
+      }
+    } catch (error) {
+      console.error('Image analysis error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'error',
+        text: inputLanguage === 'my'
+          ? "မျက်နှာကို သေချာ မတွေ့ရပါဘူးဗျ။ ပြန်ရိုက်ကြည့်ပေးပါလား။"
+          : "Could not detect a face clearly. Please try again with better lighting.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const toggleListening = () => {
     if (recognitionRef.current) {
       // Update language before starting
@@ -259,14 +326,6 @@ export default function ChatContainer() {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const emotionIcons = {
-    joy: <Smile className="w-4 h-4" />,
-    anger: <Frown className="w-4 h-4" />,
-    sadness: <Heart className="w-4 h-4" />,
-    fear: <Zap className="w-4 h-4" />,
-    neutral: <Meh className="w-4 h-4" />,
   };
 
   return (
@@ -303,9 +362,8 @@ export default function ChatContainer() {
                     animate={{ opacity: 1, x: 0 }}
                     whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                     onClick={() => loadChat(chat.id)}
-                    className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors ${
-                      currentChatId === chat.id ? 'bg-slate-800' : ''
-                    }`}
+                    className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors ${currentChatId === chat.id ? 'bg-slate-800' : ''
+                      }`}
                   >
                     <MessageSquare className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-300 flex-1 truncate">
@@ -339,7 +397,7 @@ export default function ChatContainer() {
       </AnimatePresence>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-3">
@@ -368,11 +426,10 @@ export default function ChatContainer() {
                   <button
                     key={m}
                     onClick={() => setDetectionMethod(m)}
-                    className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
-                      detectionMethod === m
+                    className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${detectionMethod === m
                         ? 'bg-white text-indigo-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                      }`}
                   >
                     {m.toUpperCase()}
                   </button>
@@ -386,15 +443,25 @@ export default function ChatContainer() {
               whileTap={{ scale: 0.95 }}
               onClick={toggleLanguage}
               title={inputLanguage === 'en' ? 'Switch to Myanmar' : 'Switch to English'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                inputLanguage === 'my'
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${inputLanguage === 'my'
                   ? 'bg-amber-50 border-amber-300 text-amber-700'
                   : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
-              }`}
+                }`}
             >
               <Languages className="w-4 h-4" />
               <span>{inputLanguage === 'my' ? '🇲🇲 မြန်မာ' : '🇺🇸 English'}</span>
             </motion.button>
+
+            <Button
+              variant={activeMode === 'social' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveMode(activeMode === 'chat' ? 'social' : 'chat')}
+              className={activeMode === 'social' ? 'bg-rose-600 hover:bg-rose-700' : 'border-slate-300 hover:bg-slate-50'}
+              title={inputLanguage === 'my' ? "လူမှုဆက်ဆံရေး အကူအညီ" : "Social Assistant"}
+            >
+              <Heart className={`w-4 h-4 mr-2 ${activeMode === 'social' ? 'fill-current' : 'text-rose-500'}`} />
+              {inputLanguage === 'my' ? 'Assistant' : 'Assistant'}
+            </Button>
 
             <Button
               variant="outline"
@@ -418,9 +485,11 @@ export default function ChatContainer() {
           </div>
         </header>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white">
-          {messages.length === 0 ? (
+        {/* Messages Area / Social Assistant */}
+        <div className="flex-1 overflow-y-auto bg-white">
+          {activeMode === 'chat' ? (
+            <div className="p-6 h-full">
+              {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center">
               {/* ChatGPT-style Welcome */}
               <motion.div
@@ -566,20 +635,33 @@ export default function ChatContainer() {
             </div>
           )}
         </div>
+      ) : (
+        <SocialAssistant 
+          language={inputLanguage} 
+          onBack={() => setActiveMode('chat')} 
+        />
+      )}
+      </div>
 
-        {/* Input Area - ChatGPT Style */}
-        <div className="border-t border-slate-200 p-4 bg-white">
+        {/* Input Area (Only in chat mode) */}
+        {activeMode === 'chat' && (
+          <div className="border-t border-slate-200 p-4 bg-white">
           <div className="max-w-3xl mx-auto">
             <div className="relative flex items-end gap-2 bg-slate-50 border border-slate-300 rounded-2xl p-2 shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200 transition-all">
+              <Button
+                onClick={() => setShowCamera(true)}
+                className="w-12 h-12 rounded-2xl bg-white border-gray-200 text-gray-500 hover:text-indigo-500 hover:bg-indigo-50 transition-all shadow-sm flex items-center justify-center p-0"
+              >
+                <Camera className="w-6 h-6" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleListening}
-                className={`shrink-0 rounded-xl ${
-                  isListening
+                className={`shrink-0 rounded-xl ${isListening
                     ? 'bg-red-100 hover:bg-red-200 text-red-600'
                     : 'hover:bg-slate-200'
-                }`}
+                  }`}
                 disabled={isLoading}
               >
                 {isListening ? (
@@ -609,11 +691,10 @@ export default function ChatContainer() {
                 <Button
                   onClick={() => handleSend()}
                   disabled={isLoading || !inputText.trim()}
-                  className={`shrink-0 rounded-xl h-11 w-11 p-0 ${
-                    inputText.trim()
+                  className={`shrink-0 rounded-xl h-11 w-11 p-0 ${inputText.trim()
                       ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg'
                       : 'bg-slate-300'
-                  }`}
+                    }`}
                 >
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -648,7 +729,17 @@ export default function ChatContainer() {
             </p>
           </div>
         </div>
-      </div>
+        )}
+      </main>
+
+      {/* Camera Modal */}
+      {showCamera && (
+        <FaceCapture
+          onCapture={handleCapture}
+          onClose={() => setShowCamera(false)}
+          language={inputLanguage}
+        />
+      )}
     </div>
   );
 }

@@ -33,12 +33,21 @@ class RuleBasedRecommender:
             count=2
         )
 
+        # Get quick action description safely
+        quick_action = recs.get('quick_action')
+        if isinstance(quick_action, str):
+            action_desc = quick_action
+        elif isinstance(quick_action, dict):
+            action_desc = quick_action.get('description', "Take a moment for yourself")
+        else:
+            action_desc = "Take a moment for yourself"
+
         # Format for backward compatibility
         formatted = {
             'send_message': recs.get('send_message', "Reach out to someone you trust"),
-            'action': recs.get('quick_action', {}).get('description', "Take a moment for yourself"),
+            'action': action_desc,
             'sources': recs.get('sources', {}),
-            'quick_action': recs.get('quick_action'),
+            'quick_action': quick_action,
             'emotion': recs.get('emotion', emotion)
         }
 
