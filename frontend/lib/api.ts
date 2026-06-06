@@ -15,7 +15,8 @@ const getApiBaseUrl = () => {
   return process.env.NEXT_PUBLIC_API_URL || '';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+// const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = "https://eab-backend.dev-hsh.online"
 
 export interface EmotionAnalysis {
   text: string;
