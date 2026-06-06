@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+    volumes:
+      - deepface-weights:/root/.deepface
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - PORT=4001
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  deepface-weights:

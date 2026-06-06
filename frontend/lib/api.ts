@@ -2,7 +2,20 @@
  * API client for communicating with the backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'eab.dev-hsh.online') {
+      return 'https://eab-backend.dev-hsh.online';
+    }
+    if (hostname.startsWith('eab.')) {
+      return `https://${hostname.replace('eab.', 'eab-backend.')}`;
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface EmotionAnalysis {
   text: string;
