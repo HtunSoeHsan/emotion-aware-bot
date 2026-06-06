@@ -2,6 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+ARG BACKEND_URL
+ARG NEXT_PUBLIC_API_URL
+ENV BACKEND_URL=$BACKEND_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 COPY package.json yarn.lock* package-lock.json* ./
 RUN \
   if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
@@ -18,6 +23,11 @@ RUN \
 # Stage 2: Runner
 FROM node:20-alpine AS runner
 WORKDIR /app
+
+ARG BACKEND_URL
+ARG NEXT_PUBLIC_API_URL
+ENV BACKEND_URL=$BACKEND_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 ENV NODE_ENV=production
 ENV PORT=4001
