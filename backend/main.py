@@ -154,7 +154,10 @@ async def detect_from_text(request: TextAnalysisRequest):
             else:
                 emotion_result = hmm_classifier.detect(request.text)
                 emotion_result['method'] = 'hmm'
-        except Exception:
+        except Exception as e:
+            import traceback
+            print(f"❌ Error during HMM detection: {e}")
+            traceback.print_exc()
             emotion_result = detect_emotion(request.text)
             emotion_result['method'] = 'vader'
             method = 'vader'
