@@ -504,6 +504,32 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8000))
 
+    # Auto-train HMM if model doesn't exist or is not trained (Crucial for Docker production compatibility)
+    try:
+        from nlp.hmm_classifier import get_classifier
+        classifier = get_classifier()
+        if not classifier.is_trained:
+            print("⚠️ HMM Model not trained or failed to load. Initiating auto-training...")
+            import json
+            # Load training data
+            base_dir = os.path.dirname(__file__)
+            data_path = os.path.join(base_dir, "data", "hmm_training_data.json")
+            if os.path.exists(data_path):
+                with open(data_path, "r") as f:
+                    training_data = json.load(f)
+                from nlp.hmm_classifier import train_hmm_classifier
+                models_dir = os.path.join(base_dir, "nlp", "models")
+                os.makedirs(models_dir, exist_ok=True)
+                save_path = os.path.join(models_dir, "hmm_emotion_model.pkl")
+                train_hmm_classifier(training_data, save_path=save_path)
+                print(f"✅ HMM model auto-trained and saved to {save_path}")
+            else:
+                print("❌ Training data file not found at", data_path)
+        else:
+            print("✅ HMM model loaded successfully on startup.")
+    except Exception as e:
+        print(f"⚠️ Error initializing/training HMM on startup: {e}")
+
     print(f"""
     ╔══════════════════════════════════════════════════════════╗
     ║       🧠 Emotion-Aware Bot API Server                    ║
