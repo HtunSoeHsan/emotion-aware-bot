@@ -402,9 +402,9 @@ class MultiSourceRecommender:
         # Get all recommendations for this emotion
         emotion_recs = self.RECOMMENDATIONS.get(emotion, self.RECOMMENDATIONS['neutral'])
 
-        # Default source types
+        # Default source types (excluding social and self_care)
         if source_types is None:
-            source_types = ['music', 'podcast', 'video', 'activity', 'self_care']
+            source_types = ['music', 'podcast', 'video', 'activity']
 
         # Build response
         recommendations = {
@@ -413,7 +413,7 @@ class MultiSourceRecommender:
         }
 
         for source_type in source_types:
-            if source_type in emotion_recs:
+            if source_type in emotion_recs and source_type != 'social':
                 items = emotion_recs[source_type]
                 # Select random items if more available than count
                 if len(items) > count:
@@ -426,16 +426,11 @@ class MultiSourceRecommender:
         if 'activity' in emotion_recs:
             recommendations['quick_action'] = random.choice(emotion_recs['activity'])
 
-        # Add send_message suggestion — Myanmar or English based on language
+        # Add quick action for Myanmar based on language
         if language == 'my':
-            my_msgs = MYANMAR_SOCIAL_MESSAGES.get(emotion, MYANMAR_SOCIAL_MESSAGES['neutral'])
-            recommendations['send_message'] = random.choice(my_msgs)
             recommendations['quick_action'] = MYANMAR_QUICK_ACTIONS.get(
                 emotion, MYANMAR_QUICK_ACTIONS['neutral']
             )
-        else:
-            if 'social' in emotion_recs:
-                recommendations['send_message'] = random.choice(emotion_recs['social'])
 
         return recommendations
 
@@ -458,7 +453,7 @@ class MultiSourceRecommender:
 
     def get_all_sources(self) -> List[str]:
         """Get list of all available source types"""
-        return ['music', 'podcast', 'video', 'activity', 'book', 'app', 'social', 'self_care']
+        return ['music', 'podcast', 'video', 'activity', 'book', 'app']
 
     def get_emotion_sources(self, emotion: str) -> List[str]:
         """Get available source types for a specific emotion"""
@@ -520,8 +515,6 @@ if __name__ == "__main__":
 
         print(f"\n📱 Quick Action: {recs['quick_action']['title']}")
         print(f"   {recs['quick_action']['description']}")
-
-        print(f"\n💬 Social: {recs['send_message']}")
 
         for source_type, items in recs['sources'].items():
             print(f"\n{source_type.upper()}:")

@@ -15,8 +15,7 @@ const getApiBaseUrl = () => {
   return process.env.NEXT_PUBLIC_API_URL || '';
 };
 
-// const API_BASE_URL = getApiBaseUrl();
-const API_BASE_URL = "https://eab-backend.dev-hsh.online"
+const API_BASE_URL = getApiBaseUrl();
 
 export interface EmotionAnalysis {
   text: string;
@@ -63,7 +62,7 @@ export interface ApiError {
 export async function analyzeText(
   text: string,
   useAi: boolean = true,
-  method: 'vader' | 'hmm' | 'hybrid' = 'vader'
+  method: 'vader' | 'hmm' | 'lmm' = 'vader'
 ): Promise<EmotionAnalysis> {
   const response = await fetch(`${API_BASE_URL}/api/detect/text`, {
     method: 'POST',
@@ -144,26 +143,4 @@ export async function checkHealth(): Promise<{
 
   return response.json();
 }
-/**
- * Analyze a social message for relationship advice
- */
-export async function analyzeSocialMessage(
-  message: string,
-  perspective: 'receiver' | 'sender' = 'receiver',
-  language: string = 'en'
-): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/api/social/analyze`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ message, perspective, language }),
-  });
 
-  if (!response.ok) {
-    const error: ApiError = await response.json();
-    throw new Error(error.detail || 'Failed to analyze social message');
-  }
-
-  return response.json();
-}

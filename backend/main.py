@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 from nlp.emotion_detector import detect_emotion
 from nlp.hmm_classifier import get_classifier as get_hmm_classifier
 from ai.groq_agent import get_ai_recommendations, get_agent
-from ai.fallback_rules import get_recommendations as get_rule_recommendations
 from ai.multi_source_recommender import get_recommendations as get_multi_source_recommendations
 from ai.external_resource_recommender import get_external_recommendations
 from nlp.myanmar_emotion_detector import is_myanmar_text, EMOTION_EMOJIS, EMOTION_COLORS
@@ -45,8 +44,8 @@ app.add_middleware(
 # Request/Response Models
 class TextAnalysisRequest(BaseModel):
     text: str
-    use_ai: bool = False
-    method: str = "vader"  # "vader", "hmm", "hybrid"
+    use_ai: bool = True
+    method: str = "vader"  # "vader", "hmm", "lmm"
 
 class ImageAnalysisRequest(BaseModel):
     image: str  # Base64 encoded image
@@ -140,8 +139,7 @@ async def detect_from_text(request: TextAnalysisRequest):
     
     if is_myanmar_text(request.text):
         emotion_result = detect_emotion(request.text)
-        emotion_result['method'] = 'myanmar_keyword'
-        method = 'myanmar_keyword'
+        method = emotion_result.get('method', 'myanmar_llm')
     elif method == "hmm":
         # Use HMM classifier for English
         try:
@@ -161,25 +159,29 @@ async def detect_from_text(request: TextAnalysisRequest):
             emotion_result = detect_emotion(request.text)
             emotion_result['method'] = 'vader'
             method = 'vader'
-    elif method == "hybrid":
-        # Use both VADER and HMM for English, combine results
-        vader_result = detect_emotion(request.text)
-        try:
-            hmm_classifier = get_hmm_classifier()
-            if hmm_classifier.is_trained:
-                hmm_result = hmm_classifier.detect(request.text)
-                # If both agree, increase confidence
-                if vader_result['emotion'] == hmm_result['emotion']:
-                    vader_result['confidence'] = min(1.0, vader_result['confidence'] + 0.1)
-                else:
-                    # Use VADER but note disagreement
-                    vader_result['hmm_emotion'] = hmm_result['emotion']
-                    vader_result['hmm_confidence'] = hmm_result['confidence']
-        except Exception:
-            pass
-        emotion_result = vader_result
-        emotion_result['method'] = 'hybrid'
-        method = 'hybrid'
+    elif method in ("lmm", "llm"):
+        # Use LLM (LMM) classifier for English
+        from ai.groq_agent import detect_emotion_ai as detect_groq
+        from ai.ollama_agent import detect_emotion_ai as detect_ollama
+        
+        emotion_result = detect_groq(request.text, language='en')
+        if not emotion_result:
+            emotion_result = detect_ollama(request.text, language='en')
+            
+        if emotion_result:
+            emotion_result['method'] = 'lmm'
+            method = 'lmm'
+        else:
+            emotion_result = {
+                'emotion': 'neutral',
+                'confidence': 0.5,
+                'emoji': '😐',
+                'color': 'gray',
+                'scores': {'joy': 0.1, 'sadness': 0.1, 'anger': 0.1, 'fear': 0.1, 'neutral': 0.6},
+                'language': 'en',
+                'method': 'english_llm_offline'
+            }
+            method = 'lmm'
     else:
         # Default to VADER for English
         emotion_result = detect_emotion(request.text)
@@ -187,7 +189,7 @@ async def detect_from_text(request: TextAnalysisRequest):
         method = 'vader'
 
     # 2. Get recommendations (AI or Rules)
-    recommendations_result: Any = {}
+    recommendations_result: Any = []
     source = "rules"
     rec_count = 0
 
@@ -199,46 +201,39 @@ async def detect_from_text(request: TextAnalysisRequest):
         )
 
         if ai_recs and 'recommendations' in ai_recs:
-            # Dev branch format (list-based)
             recommendations_result = ai_recs['recommendations']
             rec_count = ai_recs.get('count', len(ai_recs['recommendations']))
             source = "ai"
         elif ai_recs:
-            # Our format (dict-based)
             recommendations_result = ai_recs
             source = "ai"
-        else:
-            # Fallback to rules
-            rule_recs = get_rule_recommendations(emotion_result['emotion'], request.text)
-            if isinstance(rule_recs, list):
-                # Dev branch format
-                recommendations_result = rule_recs
-                rec_count = len(rule_recs)
-            else:
-                # Our format (multi-source dict)
-                recommendations_result = rule_recs
-                rec_count = 1
-            source = "rules"
-    else:
-        # Use rules only
-        rule_recs = get_rule_recommendations(emotion_result['emotion'], request.text)
-        if isinstance(rule_recs, list):
-            recommendations_result = rule_recs
-            rec_count = len(rule_recs)
-        else:
-            recommendations_result = rule_recs
-            rec_count = 1
 
     # Detect language from emotion result
     detected_language = emotion_result.get('language', 'en')
 
-    # Get multi-source recommendations
+    # Get multi-source recommendations (excluding self_care)
     multi_source_recs = get_multi_source_recommendations(
         emotion=emotion_result['emotion'],
         context=request.text,
-        source_types=['music', 'podcast', 'video', 'activity', 'self_care'],
+        source_types=['music', 'podcast', 'video', 'activity'],
         language=detected_language
     )
+
+    # Fallback to curated recommendations if AI is offline or disabled
+    if not recommendations_result:
+        activity_items = multi_source_recs.get('sources', {}).get('activity', [])
+        
+        fallback_list = []
+        for act in activity_items[:2]:
+            text_val = act.get("description") or act.get("title") if isinstance(act, dict) else str(act)
+            fallback_list.append({
+                "type": "action",
+                "label": "Mindfulness",
+                "text": text_val
+            })
+        recommendations_result = fallback_list
+        rec_count = len(fallback_list)
+        source = "rules"
 
     # Get external resource recommendations (YouTube, Spotify, etc.)
     external_recs = get_external_recommendations(
@@ -297,8 +292,7 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
     from nlp.myanmar_emotion_detector import is_myanmar_text
     if is_myanmar_text(transcribed_text):
         emotion_result = detect_emotion(transcribed_text)
-        emotion_result['method'] = 'myanmar_keyword'
-        method = 'myanmar_keyword'
+        method = emotion_result.get('method', 'myanmar_llm')
     elif method == "hmm":
         try:
             hmm_classifier = get_hmm_classifier()
@@ -313,24 +307,29 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
             emotion_result = detect_emotion(transcribed_text)
             emotion_result['method'] = 'vader'
             method = 'vader'
-    elif method == "hybrid":
-        # Use both VADER and HMM for English
-        vader_result = detect_emotion(transcribed_text)
-        try:
-            hmm_classifier = get_hmm_classifier()
-            if hmm_classifier.is_trained:
-                hmm_result = hmm_classifier.detect(transcribed_text)
-                # If both agree, increase confidence
-                if vader_result['emotion'] == hmm_result['emotion']:
-                    vader_result['confidence'] = min(1.0, vader_result['confidence'] + 0.1)
-                else:
-                    vader_result['hmm_emotion'] = hmm_result['emotion']
-                    vader_result['hmm_confidence'] = hmm_result['confidence']
-        except Exception:
-            pass
-        emotion_result = vader_result
-        emotion_result['method'] = 'hybrid'
-        method = 'hybrid'
+    elif method in ("lmm", "llm"):
+        # Use LLM (LMM) classifier for English
+        from ai.groq_agent import detect_emotion_ai as detect_groq
+        from ai.ollama_agent import detect_emotion_ai as detect_ollama
+        
+        emotion_result = detect_groq(transcribed_text, language='en')
+        if not emotion_result:
+            emotion_result = detect_ollama(transcribed_text, language='en')
+            
+        if emotion_result:
+            emotion_result['method'] = 'lmm'
+            method = 'lmm'
+        else:
+            emotion_result = {
+                'emotion': 'neutral',
+                'confidence': 0.5,
+                'emoji': '😐',
+                'color': 'gray',
+                'scores': {'joy': 0.1, 'sadness': 0.1, 'anger': 0.1, 'fear': 0.1, 'neutral': 0.6},
+                'language': 'en',
+                'method': 'english_llm_offline'
+            }
+            method = 'lmm'
     else:
         # Default to VADER for English
         emotion_result = detect_emotion(transcribed_text)
@@ -338,7 +337,7 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         method = 'vader'
 
     # 3. Get recommendations (AI or Rules)
-    recommendations_result: Any = {}
+    recommendations_result: Any = []
     source = "rules"
     rec_count = 0
 
@@ -360,27 +359,30 @@ async def detect_from_voice(request: VoiceAnalysisRequest):
         elif ai_recs:
             recommendations_result = ai_recs
             source = "ai"
-        else:
-            rule_recs = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
-            recommendations_result = rule_recs if isinstance(rule_recs, list) else [rule_recs]
-            rec_count = len(recommendations_result)
-            source = "rules"
-    else:
-        rule_recs = get_rule_recommendations(emotion_result['emotion'], transcribed_text)
-        recommendations_result = rule_recs if isinstance(rule_recs, list) else [rule_recs]
-        rec_count = len(recommendations_result)
-        source = "rules"
 
-    # Detect language from emotion result
-    detected_language = emotion_result.get('language', 'en')
-
-    # Get multi-source recommendations
+    # Get multi-source recommendations (excluding self_care)
     multi_source_recs = get_multi_source_recommendations(
         emotion=emotion_result['emotion'],
         context=transcribed_text,
-        source_types=['music', 'podcast', 'video', 'activity', 'social', 'self_care'],
+        source_types=['music', 'podcast', 'video', 'activity'],
         language=detected_language
     )
+
+    # Fallback to curated recommendations if AI is offline or disabled
+    if not recommendations_result:
+        activity_items = multi_source_recs.get('sources', {}).get('activity', [])
+        
+        fallback_list = []
+        for act in activity_items[:2]:
+            text_val = act.get("description") or act.get("title") if isinstance(act, dict) else str(act)
+            fallback_list.append({
+                "type": "action",
+                "label": "Mindfulness",
+                "text": text_val
+            })
+        recommendations_result = fallback_list
+        rec_count = len(fallback_list)
+        source = "rules"
 
     # Get external resource recommendations
     external_recs = get_external_recommendations(
@@ -464,6 +466,19 @@ async def detect_from_image(request: ImageAnalysisRequest):
     if ai_recs and 'recommendations' in ai_recs:
         recommendations_result = ai_recs['recommendations']
         source = "ai"
+    else:
+        # Fallback to curated recommendations
+        activity_items = multi_source_recs.get('sources', {}).get('activity', [])
+        fallback_list = []
+        for act in activity_items[:2]:
+            text_val = act.get("description") or act.get("title") if isinstance(act, dict) else str(act)
+            fallback_list.append({
+                "type": "action",
+                "label": "Mindfulness",
+                "text": text_val
+            })
+        recommendations_result = fallback_list
+        source = "rules"
 
     return {
         "text": display_text,
@@ -479,28 +494,7 @@ async def detect_from_image(request: ImageAnalysisRequest):
         "language": request.language
     }
 
-class SocialAnalysisRequest(BaseModel):
-    message: str
-    perspective: str = "receiver"  # "receiver" or "sender"
-    language: str = "en"
 
-@app.post("/api/social/analyze")
-async def analyze_social_message(request: SocialAnalysisRequest):
-    """
-    Analyze a social message (relationship advice)
-    """
-    from ai.groq_agent import get_social_advice
-    
-    advice = get_social_advice(
-        request.message, 
-        request.perspective, 
-        request.language
-    )
-    
-    if not advice:
-        raise HTTPException(status_code=500, detail="Failed to get social advice")
-        
-    return advice
 
 if __name__ == "__main__":
     # Get configuration from environment

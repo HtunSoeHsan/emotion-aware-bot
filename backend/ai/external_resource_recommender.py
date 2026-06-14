@@ -117,11 +117,18 @@ class ExternalResourceRecommender:
             return cached
 
         # Build search query
-        queries = self.EMOTION_QUERIES.get(emotion, {}).get('youtube', ['calming music'])
+        search_query = ""
         if context:
-            queries.append(context)
-
-        search_query = ' '.join(queries[:2])  # Use top 2 queries
+            dynamic_queries = self._generate_dynamic_queries(emotion, context)
+            search_query = dynamic_queries.get('youtube_query', '')
+            
+        if not search_query:
+            # Fallback to static queries (making a copy of the list to avoid dictionary mutation)
+            static_queries = self.EMOTION_QUERIES.get(emotion, {}).get('youtube', ['calming music'])
+            queries = list(static_queries)
+            if context:
+                queries = [context] + queries
+            search_query = ' '.join(queries[:2])  # Use top 2 queries
 
         try:
             url = "https://www.googleapis.com/youtube/v3/search"
@@ -193,43 +200,8 @@ class ExternalResourceRecommender:
 
         return videos
 
-    def get_spotify_playlists(self, emotion: str, context: str = "", limit: int = 5) -> List[Dict]:
-        """
-        Fetch music playlists (Spotify + Myanmar alternatives)
-
-        Args:
-            emotion: Detected emotion
-            context: Additional context
-            limit: Number of playlists
-
-        Returns:
-            List of playlist recommendations
-        """
-        # Spotify playlists (global)
-        spotify_playlists = {
-            'joy': [
-                {'title': 'Happy Hits!', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DXdPec7aLTmlC', 'description': 'Feel good pop hits', 'source': 'spotify'},
-                {'title': 'Good Vibes', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX9XIFQuFvzM4', 'description': 'Positive energy music', 'source': 'spotify'}
-            ],
-            'anger': [
-                {'title': 'Peaceful Piano', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX4sWSpwq3LiO', 'description': 'Calming piano pieces', 'source': 'spotify'},
-                {'title': 'Deep Focus', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWZeKCadgRdKQ', 'description': 'Focus and calm', 'source': 'spotify'}
-            ],
-            'sadness': [
-                {'title': 'Sad Songs', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX3YSRoSdA634', 'description': 'Emotional comfort songs', 'source': 'spotify'},
-                {'title': 'Comfort Songs', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX7K31D69s4M1', 'description': 'Songs that hug you back', 'source': 'spotify'}
-            ],
-            'fear': [
-                {'title': 'Anxiety Relief', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWZqd5JICZI0u', 'description': 'Calming music for anxiety', 'source': 'spotify'},
-                {'title': 'Meditation Music', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWZqd5JICZI0u', 'description': 'Peaceful meditation', 'source': 'spotify'}
-            ],
-            'neutral': [
-                {'title': 'Lo-Fi Beats', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn', 'description': 'Chill lo-fi beats', 'source': 'spotify'},
-                {'title': 'Peaceful Guitar', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX1n9whBbBKoL', 'description': 'Gentle guitar music', 'source': 'spotify'}
-            ]
-        }
-
-        # Myanmar-specific music alternatives (YouTube Music, Facebook, local platforms)
+    def _get_myanmar_music_fallback(self, emotion: str) -> List[Dict]:
+        """Myanmar-specific music alternatives"""
         myanmar_music = {
             'joy': [
                 {'title': 'Myanmar Happy Songs Playlist', 'url': 'https://www.youtube.com/results?search_query=myanmar+happy+songs', 'description': 'မြန်မာသီချင်းပျော်ရွှင်စရာများ', 'source': 'youtube_music'},
@@ -257,23 +229,122 @@ class ExternalResourceRecommender:
                 {'title': 'Myanmar Study Music', 'url': 'https://www.youtube.com/results?search_query=myanmar+study+music', 'description': 'စာကျက်ဂီတ', 'source': 'youtube_music'}
             ]
         }
+        res = myanmar_music.get(emotion, myanmar_music['neutral'])
+        for item in res:
+            item['emotion'] = emotion
+        return res
 
-        # Combine both sources
+    def _get_fallback_spotify(self, emotion: str, limit: int = 5) -> List[Dict]:
+        """Fallback Spotify recommendations"""
+        spotify_playlists = {
+            'joy': [
+                {'title': 'Happy Hits!', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DXdPec7aLTmlC', 'description': 'Feel good pop hits', 'source': 'spotify'},
+                {'title': 'Good Vibes', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX9XIFQuFvzM4', 'description': 'Positive energy music', 'source': 'spotify'}
+            ],
+            'anger': [
+                {'title': 'Peaceful Piano', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX4sWSpwq3LiO', 'description': 'Calming piano pieces', 'source': 'spotify'},
+                {'title': 'Deep Focus', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWZeKCadgRdKQ', 'description': 'Focus and calm', 'source': 'spotify'}
+            ],
+            'sadness': [
+                {'title': 'Sad Songs', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX3YSRoSdA634', 'description': 'Emotional comfort songs', 'source': 'spotify'},
+                {'title': 'Comfort Songs', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX7K31D69s4M1', 'description': 'Songs that hug you back', 'source': 'spotify'}
+            ],
+            'fear': [
+                {'title': 'Anxiety Relief', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWZqd5JICZI0u', 'description': 'Calming music for anxiety', 'source': 'spotify'},
+                {'title': 'Meditation Music', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWZqd5JICZI0u', 'description': 'Peaceful meditation', 'source': 'spotify'}
+            ],
+            'neutral': [
+                {'title': 'Lo-Fi Beats', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn', 'description': 'Chill lo-fi beats', 'source': 'spotify'},
+                {'title': 'Peaceful Guitar', 'url': 'https://open.spotify.com/playlist/37i9dQZF1DX1n9whBbBKoL', 'description': 'Gentle guitar music', 'source': 'spotify'}
+            ]
+        }
+        
         emotion_spotify = spotify_playlists.get(emotion, spotify_playlists['neutral'])
-        emotion_myanmar = myanmar_music.get(emotion, myanmar_music['neutral'])
-
-        # Return based on limit (mix of both)
+        emotion_myanmar = self._get_myanmar_music_fallback(emotion)
+        
         combined = []
         for i in range(limit):
             if i < len(emotion_spotify):
-                combined.append(emotion_spotify[i])
+                combined.append(emotion_spotify[i].copy())
             if i < len(emotion_myanmar):
-                combined.append(emotion_myanmar[i])
-
+                combined.append(emotion_myanmar[i].copy())
+                
         for item in combined[:limit]:
             item['emotion'] = emotion
-
+            
         return combined[:limit]
+
+    def get_spotify_playlists(self, emotion: str, context: str = "", limit: int = 5) -> List[Dict]:
+        """
+        Fetch music playlists (Spotify + Myanmar alternatives) dynamically
+        """
+        access_token = self._get_spotify_access_token()
+        
+        # If Spotify token is not available, return the high-quality fallbacks
+        if not access_token:
+            return self._get_fallback_spotify(emotion, limit)
+            
+        cache_key = self._generate_cache_key('spotify_api', emotion, context, limit)
+        cached = self._get_from_cache(cache_key)
+        if cached:
+            return cached
+            
+        # Build search query
+        search_query = ""
+        if context:
+            dynamic_queries = self._generate_dynamic_queries(emotion, context)
+            search_query = dynamic_queries.get('spotify_query', '')
+            
+        if not search_query:
+            queries = self.EMOTION_QUERIES.get(emotion, {}).get('spotify', ['calming music'])
+            if context:
+                queries = [context] + queries
+            search_query = ' '.join(queries[:2])
+            
+        try:
+            url = "https://api.spotify.com/v1/search"
+            headers = {
+                "Authorization": f"Bearer {access_token}"
+            }
+            params = {
+                "q": search_query,
+                "type": "playlist",
+                "limit": limit
+            }
+            
+            response = self.session.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            playlists = []
+            for item in data.get('playlists', {}).get('items', []):
+                if not item:
+                    continue
+                playlists.append({
+                    'title': item.get('name', 'Spotify Playlist'),
+                    'url': item.get('external_urls', {}).get('spotify', ''),
+                    'description': item.get('description', '') or f"A playlist for feeling {emotion}",
+                    'source': 'spotify',
+                    'emotion': emotion
+                })
+                
+            # If we fetched fewer playlists than limit, pad with Myanmar alternatives
+            if len(playlists) < limit:
+                myanmar_alts = self._get_myanmar_music_fallback(emotion)
+                # Filter out duplicates and pad
+                for alt in myanmar_alts:
+                    if len(playlists) >= limit:
+                        break
+                    # Avoid duplicate URLs
+                    if not any(p['url'] == alt['url'] for p in playlists):
+                        playlists.append(alt)
+                    
+            self._save_to_cache(cache_key, playlists)
+            return playlists
+            
+        except Exception as e:
+            print(f"Spotify Search API error: {e}")
+            return self._get_fallback_spotify(emotion, limit)
 
     def get_podcast_episodes(self, emotion: str, context: str = "", limit: int = 5) -> List[Dict]:
         """
@@ -578,6 +649,114 @@ class ExternalResourceRecommender:
                 recommendations['quick_picks'][source] = items[0]
 
         return recommendations
+
+    def _generate_dynamic_queries(self, emotion: str, context: str) -> Dict[str, str]:
+        """Generate dynamic search queries for YouTube and Spotify using LLM"""
+        if not context:
+            return {}
+            
+        prompt = f"""
+Analyze the user's emotion and the context:
+Emotion: {emotion.upper()}
+Context/Message: "{context}"
+
+Provide exactly 2 optimized search queries:
+1. A YouTube search query for finding helpful videos (e.g. mindfulness exercises, specific calming guides, or inspiring talks).
+2. A Spotify search query for finding relevant music playlists or tracks (e.g. specific genres, moods, or calming soundscapes).
+
+Respond ONLY in valid JSON format:
+{{
+    "youtube_query": "search query here",
+    "spotify_query": "search query here"
+}}
+"""
+        try:
+            # Try Groq first
+            from ai.groq_agent import get_agent as get_groq_agent
+            groq_agent = get_groq_agent()
+            if groq_agent and groq_agent.is_available():
+                response = groq_agent.client.chat.completions.create(
+                    model=groq_agent.model,
+                    messages=[
+                        {"role": "system", "content": "You are a precise search query generator. Respond only with valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=150,
+                    timeout=5
+                )
+                content = response.choices[0].message.content.strip()
+                if content.startswith('```'):
+                    lines = content.split('\n')
+                    content = '\n'.join(lines[1:-1])
+                data = json.loads(content)
+                return data
+        except Exception as e:
+            print(f"Error generating dynamic queries with Groq: {e}")
+            
+        try:
+            # Try Ollama fallback
+            from ai.ollama_agent import get_agent as get_ollama_agent
+            ollama_agent = get_ollama_agent()
+            if ollama_agent and ollama_agent.is_available():
+                response = ollama_agent.client.chat(
+                    model=ollama_agent.model,
+                    messages=[
+                        {'role': 'system', 'content': "You are a precise search query generator. Respond only with valid JSON."},
+                        {'role': 'user', 'content': prompt}
+                    ]
+                )
+                content = response['message']['content'].strip()
+                if content.startswith('```'):
+                    lines = content.split('\n')
+                    content = '\n'.join(lines[1:-1])
+                data = json.loads(content)
+                return data
+        except Exception as e:
+            print(f"Error generating dynamic queries with Ollama: {e}")
+            
+        return {}
+
+    def _get_spotify_access_token(self) -> Optional[str]:
+        """Retrieve a Spotify access token using Client Credentials Flow"""
+        if not self.SPOTIFY_CLIENT_ID or not self.SPOTIFY_CLIENT_SECRET:
+            return None
+            
+        cache_key = 'spotify_access_token'
+        if cache_key in self._cache:
+            cached = self._cache[cache_key]
+            # Token expires in 1 hour; cache for 50 minutes
+            if datetime.now() - cached['timestamp'] < timedelta(minutes=50):
+                return cached['data']
+            
+        try:
+            import base64
+            auth_str = f"{self.SPOTIFY_CLIENT_ID}:{self.SPOTIFY_CLIENT_SECRET}"
+            b64_auth = base64.b64encode(auth_str.encode()).decode()
+            
+            url = "https://accounts.spotify.com/api/token"
+            headers = {
+                "Authorization": f"Basic {b64_auth}",
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            data = {"grant_type": "client_credentials"}
+            
+            response = self.session.post(url, headers=headers, data=data, timeout=5)
+            response.raise_for_status()
+            res_data = response.json()
+            
+            access_token = res_data.get("access_token")
+            if access_token:
+                self._cache[cache_key] = {
+                    'data': access_token,
+                    'timestamp': datetime.now()
+                }
+                return access_token
+        except Exception as e:
+            print(f"Spotify token retrieval error: {e}")
+            
+        return None
+
 
 
 # Singleton instance

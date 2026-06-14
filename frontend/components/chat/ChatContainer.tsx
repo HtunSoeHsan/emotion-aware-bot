@@ -28,8 +28,7 @@ import { Input } from '@/components/ui/input';
 import MessageBubble, { Message } from './MessageBubble';
 import RecommendationCard from './RecommendationCard';
 import FaceCapture from './FaceCapture';
-import SocialAssistant from './SocialAssistant';
-import { analyzeText, checkHealth, analyzeImage, analyzeSocialMessage } from '@/lib/api';
+import { analyzeText, checkHealth, analyzeImage } from '@/lib/api';
 
 // Chat history item
 interface ChatSession {
@@ -45,16 +44,14 @@ export default function ChatContainer() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
-  const [useAI, setUseAI] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   // Language toggle: 'en' = English, 'my' = Myanmar
   const [inputLanguage, setInputLanguage] = useState<'en' | 'my'>('en');
-  // Detection method: 'vader', 'hmm', or 'hybrid'
-  const [detectionMethod, setDetectionMethod] = useState<'vader' | 'hmm' | 'hybrid'>('vader');
+  // Detection method: 'vader', 'hmm', or 'lmm'
+  const [detectionMethod, setDetectionMethod] = useState<'vader' | 'hmm' | 'lmm'>('vader');
   const [showCamera, setShowCamera] = useState(false);
-  const [activeMode, setActiveMode] = useState<'chat' | 'social'>('chat');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -73,11 +70,9 @@ export default function ChatContainer() {
     checkHealth()
       .then((health) => {
         setAiAvailable(health.ai_available);
-        setUseAI(health.ai_available);
       })
       .catch(() => {
         setAiAvailable(false);
-        setUseAI(false);
       });
 
     // Setup speech recognition
@@ -182,8 +177,8 @@ export default function ChatContainer() {
       // Call API with selected method
       const result = await analyzeText(
         messageText,
-        useAI,
-        inputLanguage === 'my' ? 'vader' : detectionMethod
+        true,
+        inputLanguage === 'my' ? 'lmm' : detectionMethod
       );
 
       // Debug: Log the full API response
@@ -411,10 +406,10 @@ export default function ChatContainer() {
             </Button>
             <div>
               <h2 className="text-lg font-semibold text-slate-800">Emotion-Aware AI</h2>
-              <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              {/* <p className="text-xs text-slate-500 flex items-center gap-1.5">
                 <span className={`w-2 h-2 rounded-full ${aiAvailable ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></span>
                 {aiAvailable ? 'Groq AI Powered' : 'Rule-based mode'}
-              </p>
+              </p> */}
             </div>
           </div>
 
@@ -422,13 +417,13 @@ export default function ChatContainer() {
             {/* Method Switcher - Only for English */}
             {inputLanguage === 'en' && (
               <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
-                {(['vader', 'hmm', 'hybrid'] as const).map((m) => (
+                {(['vader', 'hmm', 'lmm'] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setDetectionMethod(m)}
                     className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${detectionMethod === m
-                        ? 'bg-white text-indigo-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
                       }`}
                   >
                     {m.toUpperCase()}
@@ -444,208 +439,172 @@ export default function ChatContainer() {
               onClick={toggleLanguage}
               title={inputLanguage === 'en' ? 'Switch to Myanmar' : 'Switch to English'}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${inputLanguage === 'my'
-                  ? 'bg-amber-50 border-amber-300 text-amber-700'
-                  : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
+                ? 'bg-amber-50 border-amber-300 text-amber-700'
+                : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
                 }`}
             >
               <Languages className="w-4 h-4" />
               <span>{inputLanguage === 'my' ? '🇲🇲 မြန်မာ' : '🇺🇸 English'}</span>
             </motion.button>
 
-            <Button
-              variant={activeMode === 'social' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveMode(activeMode === 'chat' ? 'social' : 'chat')}
-              className={activeMode === 'social' ? 'bg-rose-600 hover:bg-rose-700' : 'border-slate-300 hover:bg-slate-50'}
-              title={inputLanguage === 'my' ? "လူမှုဆက်ဆံရေး အကူအညီ" : "Social Assistant"}
-            >
-              <Heart className={`w-4 h-4 mr-2 ${activeMode === 'social' ? 'fill-current' : 'text-rose-500'}`} />
-              {inputLanguage === 'my' ? 'Assistant' : 'Assistant'}
-            </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setUseAI(!useAI)}
-              className="border-slate-300 hover:bg-slate-50"
-              disabled={!aiAvailable}
-            >
-              {useAI ? (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2 text-indigo-600" />
-                  AI Mode
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 mr-2 text-amber-600" />
-                  Fast Mode
-                </>
-              )}
-            </Button>
+
           </div>
         </header>
 
-        {/* Messages Area / Social Assistant */}
+        {/* Messages Area */}
         <div className="flex-1 overflow-y-auto bg-white">
-          {activeMode === 'chat' ? (
-            <div className="p-6 h-full">
-              {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center">
-              {/* ChatGPT-style Welcome */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center max-w-2xl"
-              >
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl">
-                  <MessageCircle className="w-10 h-10 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800 mb-3">
-                  How can I help you today?
-                </h3>
-                <p className="text-slate-600 mb-8 leading-relaxed">
-                  I can detect your emotions and provide personalized recommendations.
-                  Try sharing how you're feeling!
-                </p>
-
-                {/* Example Prompts Grid — language-aware */}
-                {inputLanguage === 'my' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                      { emoji: '😊', text: 'ဒီနေ့ တော်တော် ပျော်တယ်!', emotion: 'ပျော်ရွှင်မှု' },
-                      { emoji: '😠', text: 'ဒေါသ တော်တော် ဖြစ်နေတယ်', emotion: 'ဒေါသ' },
-                      { emoji: '😢', text: 'ဝမ်းနည်းနေတယ်...', emotion: 'ဝမ်းနည်းမှု' },
-                      { emoji: '😨', text: 'ကြောက်နေမိတယ်', emotion: 'ကြောက်ရွံ့မှု' },
-                    ].map((example, index) => (
-                      <motion.button
-                        key={index}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleSend(example.text)}
-                        className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left hover:border-amber-400 hover:bg-amber-100 hover:shadow-md transition-all duration-200 group"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-2xl">{example.emoji}</span>
-                          <div>
-                            <p className="text-sm font-medium text-slate-700 group-hover:text-amber-700">
-                              {example.text}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                      { emoji: '😊', text: "I just got amazing news!", emotion: 'Share joy' },
-                      { emoji: '😠', text: "This is so frustrating!", emotion: 'Express anger' },
-                      { emoji: '😢', text: "I'm feeling down today", emotion: 'Need support' },
-                      { emoji: '😨', text: "I'm worried about something", emotion: 'Share fear' },
-                    ].map((example, index) => (
-                      <motion.button
-                        key={index}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleSend(example.text)}
-                        className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md transition-all duration-200 group"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-2xl">{example.emoji}</span>
-                          <div>
-                            <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600">
-                              {example.text}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          ) : (
-            <div className="max-w-3xl mx-auto space-y-6">
-              <AnimatePresence>
-                {messages.map((message) => (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {message.type === 'recommendation' ? (
-                      <RecommendationCard
-                        emotion={message.emotion!}
-                        color={message.color!}
-                        recommendations={message.recommendations!}
-                        source={message.source}
-                        multi_source={message.multi_source}
-                        external_resources={message.external_resources}
-                      />
-                    ) : (
-                      <MessageBubble message={message} />
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-
-              {isLoading && (
+          <div className="p-6 h-full">
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center">
+                {/* ChatGPT-style Welcome */}
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3"
+                  className="text-center max-w-2xl"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl">
+                    <MessageCircle className="w-10 h-10 text-white" />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm text-slate-600">Analyzing</span>
-                    <span className="flex gap-1">
-                      <motion.span
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
-                      ></motion.span>
-                      <motion.span
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
-                      ></motion.span>
-                      <motion.span
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-                        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
-                      ></motion.span>
-                    </span>
-                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-3">
+                    How can I help you today?
+                  </h3>
+                  <p className="text-slate-600 mb-8 leading-relaxed">
+                    I can detect your emotions and provide personalized recommendations.
+                    Try sharing how you're feeling!
+                  </p>
+
+                  {/* Example Prompts Grid — language-aware */}
+                  {inputLanguage === 'my' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { emoji: '😊', text: 'ဒီနေ့ တော်တော် ပျော်တယ်!', emotion: 'ပျော်ရွှင်မှု' },
+                        { emoji: '😠', text: 'ဒေါသ တော်တော် ဖြစ်နေတယ်', emotion: 'ဒေါသ' },
+                        { emoji: '😢', text: 'ဝမ်းနည်းနေတယ်...', emotion: 'ဝမ်းနည်းမှု' },
+                        { emoji: '😨', text: 'ကြောက်နေမိတယ်', emotion: 'ကြောက်ရွံ့မှု' },
+                      ].map((example, index) => (
+                        <motion.button
+                          key={index}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          whileHover={{ scale: 1.02, y: -2 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleSend(example.text)}
+                          className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left hover:border-amber-400 hover:bg-amber-100 hover:shadow-md transition-all duration-200 group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">{example.emoji}</span>
+                            <div>
+                              <p className="text-sm font-medium text-slate-700 group-hover:text-amber-700">
+                                {example.text}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
+                            </div>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { emoji: '😊', text: "I just got amazing news!", emotion: 'Share joy' },
+                        { emoji: '😠', text: "This is so frustrating!", emotion: 'Express anger' },
+                        { emoji: '😢', text: "I'm feeling down today", emotion: 'Need support' },
+                        { emoji: '😨', text: "I'm worried about something", emotion: 'Share fear' },
+                      ].map((example, index) => (
+                        <motion.button
+                          key={index}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          whileHover={{ scale: 1.02, y: -2 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleSend(example.text)}
+                          className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md transition-all duration-200 group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">{example.emoji}</span>
+                            <div>
+                              <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-600">
+                                {example.text}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-1">{example.emotion}</p>
+                            </div>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
-              )}
+              </div>
+            ) : (
+              <div className="max-w-3xl mx-auto space-y-6">
+                <AnimatePresence>
+                  {messages.map((message) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {message.type === 'recommendation' ? (
+                        <RecommendationCard
+                          emotion={message.emotion!}
+                          color={message.color!}
+                          recommendations={message.recommendations!}
+                          source={message.source}
+                          multi_source={message.multi_source}
+                          external_resources={message.external_resources}
+                        />
+                      ) : (
+                        <MessageBubble message={message} />
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
 
-              <div ref={messagesEndRef} />
-            </div>
-          )}
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-slate-600">Analyzing</span>
+                      <span className="flex gap-1">
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                          className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                        ></motion.span>
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                          className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                        ></motion.span>
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                          className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                        ></motion.span>
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <SocialAssistant 
-          language={inputLanguage} 
-          onBack={() => setActiveMode('chat')} 
-        />
-      )}
-      </div>
 
-        {/* Input Area (Only in chat mode) */}
-        {activeMode === 'chat' && (
-          <div className="border-t border-slate-200 p-4 bg-white">
+        {/* Input Area */}
+        <div className="border-t border-slate-200 p-4 bg-white">
           <div className="max-w-3xl mx-auto">
             <div className="relative flex items-end gap-2 bg-slate-50 border border-slate-300 rounded-2xl p-2 shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200 transition-all">
               <Button
@@ -659,8 +618,8 @@ export default function ChatContainer() {
                 size="icon"
                 onClick={toggleListening}
                 className={`shrink-0 rounded-xl ${isListening
-                    ? 'bg-red-100 hover:bg-red-200 text-red-600'
-                    : 'hover:bg-slate-200'
+                  ? 'bg-red-100 hover:bg-red-200 text-red-600'
+                  : 'hover:bg-slate-200'
                   }`}
                 disabled={isLoading}
               >
@@ -692,8 +651,8 @@ export default function ChatContainer() {
                   onClick={() => handleSend()}
                   disabled={isLoading || !inputText.trim()}
                   className={`shrink-0 rounded-xl h-11 w-11 p-0 ${inputText.trim()
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg'
-                      : 'bg-slate-300'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg'
+                    : 'bg-slate-300'
                     }`}
                 >
                   {isLoading ? (
@@ -729,7 +688,6 @@ export default function ChatContainer() {
             </p>
           </div>
         </div>
-        )}
       </main>
 
       {/* Camera Modal */}

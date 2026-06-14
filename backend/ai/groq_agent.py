@@ -23,15 +23,14 @@ class GroqAgent:
     DEFAULT_MODEL = "llama-3.1-8b-instant"  # Llama 3.1 8B Instant (fast!)
     
     # System prompt for recommendation generation
-    SYSTEM_PROMPT = """You are an empathetic emotion support and social communication assistant. 
-Your task is to provide helpful, actionable recommendations for someone experiencing an emotion or trying to communicate effectively.
+    SYSTEM_PROMPT = """You are an empathetic emotional support assistant. 
+Your task is to provide helpful, actionable recommendations for someone experiencing an emotion.
 
-For each request, provide 5-6 diverse recommendations including:
-1. Social Replies: Suggestions for what to send to a partner, friend, or family member.
-2. Relationship Insights: Predict how the recipient will feel if a specific message is sent.
-3. Reply Analysis: If the user provided a message they received, analyze its emotion and suggest a reply.
-4. Self-care & Activities: Practical actions for immediate emotional relief.
+For each request, provide 2-3 diverse recommendations focusing solely on:
+1. Mindfulness: Short calming exercises or breathing techniques.
+2. Daily Exercise: Active physical or mental tasks to soothe or celebrate the emotion.
 
+Do NOT include any general activities, activity cards, self-care tips/advice, social replies, relationship advice, or messages to send to others.
 Keep responses concise, supportive, and practical. Use a warm, empathetic tone.
 If the language is set to 'my', provide ALL text in Myanmar language (Burmese).
 """
@@ -97,7 +96,7 @@ If the language is set to 'my', provide ALL text in Myanmar language (Burmese).
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=200,
+                max_tokens=800,
                 timeout=10  # 10 second timeout
             )
             
@@ -113,6 +112,159 @@ If the language is set to 'my', provide ALL text in Myanmar language (Burmese).
         except Exception as e:
             print(f"Groq agent error: {e}")
             return None
+
+    def detect_emotion(self, text: str, language: str = 'my') -> Optional[Dict]:
+        """
+        Classify emotion of text using Groq LLM
+        
+        Args:
+            text: Text to analyze
+            language: Language of the input text
+            
+        Returns:
+            Dictionary with emotion, confidence, emoji, color, scores, language, method
+        """
+        if not self.is_available():
+            return None
+        
+        prompt = f"""
+You are a precise emotion classification assistant. Analyze the emotion of the following text:
+"{text}"
+
+Classify the text into one of these 5 emotions: 'joy', 'sadness', 'anger', 'fear', 'neutral'.
+
+Here are some examples of Myanmar (Burmese) text classification:
+Text: "ဒီနေ့ တော်တော် ပျော်တယ်"
+Classification: {{
+    "emotion": "joy",
+    "confidence": 0.95,
+    "scores": {{
+        "joy": 0.95,
+        "sadness": 0.01,
+        "anger": 0.01,
+        "fear": 0.01,
+        "neutral": 0.02
+    }}
+}}
+
+Text: "ငါ့ဘဝကြီးက အရမ်းပင်ပန်းလွန်းလို့ ငိုချင်တယ်"
+Classification: {{
+    "emotion": "sadness",
+    "confidence": 0.90,
+    "scores": {{
+        "joy": 0.01,
+        "sadness": 0.90,
+        "anger": 0.03,
+        "fear": 0.03,
+        "neutral": 0.03
+    }}
+}}
+
+Text: "ဒီပစ္စည်းက ပျက်စီးနေတယ်၊ တော်တော်စိတ်တိုဖို့ကောင်းတယ်"
+Classification: {{
+    "emotion": "anger",
+    "confidence": 0.95,
+    "scores": {{
+        "joy": 0.01,
+        "sadness": 0.02,
+        "anger": 0.95,
+        "fear": 0.01,
+        "neutral": 0.01
+    }}
+}}
+
+Text: "ရှေ့ဆက်ပြီး ဘာဖြစ်လာမလဲဆိုတာ တွေးပြီး တုန်လှုပ်ခြောက်ခြားနေမိတယ်"
+Classification: {{
+    "emotion": "fear",
+    "confidence": 0.92,
+    "scores": {{
+        "joy": 0.01,
+        "sadness": 0.02,
+        "anger": 0.02,
+        "fear": 0.92,
+        "neutral": 0.03
+    }}
+}}
+
+Text: "စားပွဲပေါ်မှာ စာအုပ်တစ်အုပ် ရှိတယ်"
+Classification: {{
+    "emotion": "neutral",
+    "confidence": 0.98,
+    "scores": {{
+        "joy": 0.00,
+        "sadness": 0.01,
+        "anger": 0.00,
+        "fear": 0.01,
+        "neutral": 0.98
+    }}
+}}
+
+Text: "မပျော်တာတော့ မဟုတ်ပါဘူး"
+Classification: {{
+    "emotion": "joy",
+    "confidence": 0.70,
+    "scores": {{
+        "joy": 0.70,
+        "sadness": 0.05,
+        "anger": 0.05,
+        "fear": 0.05,
+        "neutral": 0.15
+    }}
+}}
+
+Respond ONLY with a JSON object for the target text. Do not include markdown code block formatting (like ```json), introduction, or explanation.
+"""
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a precise emotion classification assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,  # low temperature for classification stability
+                max_tokens=150,
+                timeout=10
+            )
+            
+            content = response.choices[0].message.content.strip()
+            
+            # Clean markdown code blocks if present
+            if content.startswith('```'):
+                lines = content.split('\n')
+                # Find start and end of json
+                content_lines = []
+                for line in lines:
+                    if not line.startswith('```'):
+                        content_lines.append(line)
+                content = '\n'.join(content_lines).strip()
+            
+            data = json.loads(content)
+            
+            # Ensure required keys exist and normalise emotion
+            emotion = data.get('emotion', 'neutral').lower()
+            if emotion not in ['joy', 'sadness', 'anger', 'fear', 'neutral']:
+                emotion = 'neutral'
+                
+            confidence = data.get('confidence', 0.5)
+            scores = data.get('scores', {})
+            
+            # Import UI mappings
+            from nlp.myanmar_emotion_detector import EMOTION_EMOJIS, EMOTION_COLORS
+            
+            return {
+                'emotion': emotion,
+                'confidence': round(confidence, 3),
+                'emoji': EMOTION_EMOJIS.get(emotion, '😐'),
+                'color': EMOTION_COLORS.get(emotion, 'gray'),
+                'scores': scores,
+                'language': language,
+                'method': 'myanmar_llm' if language == 'my' else 'english_llm',
+            }
+            
+        except Exception as e:
+            print(f"Groq detect_emotion error: {e}")
+            return None
+
     
     def _build_prompt(self, emotion: str, context: str, language: str = 'en') -> str:
         """Build prompt for LLM"""
@@ -124,43 +276,23 @@ Context/Message: "{context}"
 
 {lang_instruction}
 
-Provide 5-6 diverse recommendations in this JSON format:
+Provide 2-3 diverse recommendations in this JSON format:
 {{
     "recommendations": [
-        {{
-            "type": "message",
-            "label": "Send to partner/friend",
-            "text": "suggested message text"
-        }},
-        {{
-            "type": "impact",
-            "label": "How they will feel",
-            "text": "prediction of how the recipient will react to the message"
-        }},
-        {{
-            "type": "reply_suggestion",
-            "label": "Suggested Reply",
-            "text": "how to reply if context is a received message"
-        }},
-        {{
-            "type": "action",
-            "label": "Activity",
-            "text": "practical action to take"
-        }},
-        {{
-            "type": "action",
-            "label": "Self-care",
-            "text": "self-care tip"
-        }},
         {{
             "type": "action",
             "label": "Mindfulness",
             "text": "calming exercise"
+        }},
+        {{
+            "type": "action",
+            "label": "Daily Exercise",
+            "text": "active physical/mental task to soothe or celebrate the emotion"
         }}
     ]
 }}
 
-Only respond with valid JSON, no additional text.
+Only respond with valid JSON, no additional text. Do NOT include any general 'Activity' or 'Self-care' recommendations.
 """
     
     def _parse_response(self, content: str) -> Optional[Dict]:
@@ -179,9 +311,14 @@ Only respond with valid JSON, no additional text.
             
             # Handle new format with multiple recommendations
             if 'recommendations' in data and isinstance(data['recommendations'], list):
+                # Filter out any Self-care or Activity recommendations
+                recs = [
+                    r for r in data['recommendations'] 
+                    if r.get('label') not in ('Self-care', 'Self-Care Action', 'Activity', 'Activity Action')
+                ]
                 return {
-                    'recommendations': data['recommendations'],
-                    'count': len(data['recommendations'])
+                    'recommendations': recs,
+                    'count': len(recs)
                 }
             
             # Fallback to old format (2 recommendations)
@@ -200,81 +337,6 @@ Only respond with valid JSON, no additional text.
             print(f"Failed to parse Groq response: {e}")
             return None
 
-    def get_social_advice(self, message: str, perspective: str = 'receiver', language: str = 'en') -> Optional[Dict]:
-        """
-        Get social/relationship advice for a message
-        """
-        if not self.is_available():
-            return None
-            
-        lang_name = "Myanmar (Burmese)" if language == 'my' else "English"
-        
-        if perspective == 'receiver':
-            prompt = f"""
-Analyze this message sent TO the user from someone else: "{message}"
-
-1. What emotion is the sender likely feeling?
-2. How should the user respond to be supportive/appropriate?
-3. Provide 3 diverse reply options.
-
-Respond in {lang_name} language in this JSON format:
-{{
-    "detected_emotion": "predicted emotion",
-    "analysis": "brief explanation of sender's state",
-    "advice": "general advice on how to handle",
-    "suggested_replies": [
-        "reply 1",
-        "reply 2",
-        "reply 3"
-    ]
-}}
-Only respond with valid JSON.
-"""
-        else:
-            prompt = f"""
-Analyze this message the user wants to send TO someone else: "{message}"
-
-1. How will the receiver likely feel when they read this?
-2. Is this message appropriate?
-3. Suggest 3 improved or alternative versions.
-
-Respond in {lang_name} language in this JSON format:
-{{
-    "predicted_impact": "predicted emotion of receiver",
-    "analysis": "brief explanation of how it might be perceived",
-    "advice": "advice on whether to send or change",
-    "suggested_replies": [
-        "alternative 1",
-        "alternative 2",
-        "alternative 3"
-    ]
-}}
-Only respond with valid JSON.
-"""
-
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are an expert relationship coach and emotion analyst."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=500,
-                timeout=15
-            )
-            
-            content = response.choices[0].message.content
-            # Clean JSON
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0]
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0]
-                
-            return json.loads(content.strip())
-        except Exception as e:
-            print(f"Social advice error: {e}")
-            return None
 
 
 # Singleton instance
@@ -310,14 +372,17 @@ def get_ai_recommendations(emotion: str, context: str, language: str = 'en') -> 
         return None
 
 
-def get_social_advice(message: str, perspective: str = 'receiver', language: str = 'en') -> Optional[Dict]:
+def detect_emotion_ai(text: str, language: str = 'my') -> Optional[Dict]:
     """
-    Convenience function to get social advice
+    Convenience function to detect emotion using Groq LLM
     """
     try:
-        return get_agent().get_social_advice(message, perspective, language)
+        return get_agent().detect_emotion(text, language)
     except Exception:
         return None
+
+
+
 
 
 if __name__ == "__main__":
@@ -341,8 +406,7 @@ if __name__ == "__main__":
                 print(f"\n{emotion.upper()}: {context}")
                 rec = agent.get_recommendations(emotion, context)
                 if rec:
-                    print(f"  ✅ Send: {rec['send_message']}")
-                    print(f"  ✅ Action: {rec['action']}")
+                    print(f"  ✅ recommendations: {rec['recommendations']}")
                 else:
                     print("  ❌ (Failed to get recommendations)")
                     
